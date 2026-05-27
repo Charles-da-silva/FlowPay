@@ -1,0 +1,27 @@
+import { httpDelete, httpGet, httpPatch, httpPost, httpPut } from "./http";
+import type {
+  AttendantResponse,
+  DashboardSummaryResponse,
+  ServiceRequestResponse,
+} from "../types/api";
+
+export const api = {
+  attendants: {
+    list: () => httpGet<AttendantResponse[]>("/api/attendants"),
+    create: (body: { name: string; categories: string[] }) =>
+      httpPost<AttendantResponse, typeof body>("/api/attendants", body),
+    update: (id: number, body: { name: string; categories: string[] }) =>
+      httpPut<AttendantResponse, typeof body>(`/api/attendants/${id}`, body),
+    delete: (id: number) => httpDelete(`/api/attendants/${id}`),
+  },
+  serviceRequests: {
+    list: () => httpGet<ServiceRequestResponse[]>("/api/service-requests"),
+    listQueue: () => httpGet<ServiceRequestResponse[]>("/api/service-requests/queue"),
+    create: (body: { customerName: string; category: string }) =>
+      httpPost<ServiceRequestResponse, typeof body>("/api/service-requests", body),
+    finish: (id: number) => httpPatch<ServiceRequestResponse>(`/api/service-requests/${id}/finish`),
+  },
+  dashboard: {
+    summary: () => httpGet<DashboardSummaryResponse>("/api/dashboard/summary"),
+  },
+};

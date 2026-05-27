@@ -1,0 +1,12 @@
+/* Tailwind v4: um único import habilita base + components + utilities. */
+@import "tailwindcss";
+
+/* Pequenos ajustes globais (o restante fica por conta do Tailwind). */
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
