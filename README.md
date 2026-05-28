@@ -217,6 +217,11 @@ cd frontend
 npm run build
 ```
 
+## CI
+
+O repositorio inclui um workflow do GitHub Actions em `.github/workflows/ci.yml`.
+Ele executa os testes do back-end com Java 21 e o build do front-end com Node.js 22 a cada push na branch `main` ou pull request.
+
 ## Observações técnicas
 
 - O Flyway versiona a estrutura inicial do banco, dados de exemplo e evoluções de métricas/pausas.
