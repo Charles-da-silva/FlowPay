@@ -150,6 +150,7 @@ public class ReportService {
         return attendantRepository.findAll()
                 .stream()
                 .map(attendant -> toAttendantReport(attendant, start, end))
+                .filter(report -> report.serviceRequests() > 0 || report.pauseCount() > 0)
                 .toList();
     }
 
