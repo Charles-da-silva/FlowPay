@@ -84,7 +84,7 @@ export function CreateAttendantForm({ onSuccess, onCancel }: CreateAttendantForm
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-slate-900">Criar novo agente</h3>
+      <h3 className="text-lg font-semibold text-slate-900">Logar novo agente</h3>
 
       <div>
         <label className="block text-sm font-medium text-slate-700">Nome</label>

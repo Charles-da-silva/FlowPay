@@ -46,7 +46,7 @@ public class AttendantService {
         Attendant existing = attendantRepository.findByBadgeIgnoreCase(badge).orElse(null);
         if (existing != null) {
             if (existing.getStatus() != AttendantStatus.INACTIVE) {
-                throw new IllegalStateException("Badge ja esta em uso por agente logado.");
+                throw new IllegalStateException("O badge informado já está em uso por outro agente logado.");
             }
 
             existing.setName(request.name());

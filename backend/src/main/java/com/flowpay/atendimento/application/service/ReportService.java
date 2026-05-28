@@ -3,6 +3,8 @@ package com.flowpay.atendimento.application.service;
 import com.flowpay.atendimento.application.dto.AttendantDailySummaryResponse;
 import com.flowpay.atendimento.application.dto.CategoryReportResponse;
 import com.flowpay.atendimento.application.dto.DailyReportResponse;
+import com.flowpay.atendimento.application.dto.DailyStatisticsResponse;
+import com.flowpay.atendimento.application.dto.WorstServiceLevelDayResponse;
 import com.flowpay.atendimento.domain.entity.Attendant;
 import com.flowpay.atendimento.domain.entity.ServiceRequest;
 import com.flowpay.atendimento.domain.enums.ServiceCategory;
@@ -68,7 +70,8 @@ public class ReportService {
                 serviceLevel,
                 averageServiceSeconds,
                 buildCategoryReports(requests),
-                buildAttendantReports(start, end)
+                buildAttendantReports(start, end),
+                buildWorstDaysReport(requests)
         );
     }
 
@@ -79,38 +82,46 @@ public class ReportService {
     public String getPeriodReportCsv(LocalDate startDate, LocalDate endDate) {
         DailyReportResponse report = getPeriodReport(startDate, endDate);
         StringBuilder csv = new StringBuilder();
+        long daysDifference = calculateDaysDifference(startDate, endDate);
 
+        csv.append("\uFEFF");
         csv.append("Relatorio gerencial FlowPay\n");
         csv.append("Data inicial,").append(report.startDate()).append("\n");
         csv.append("Data final,").append(report.endDate()).append("\n");
         csv.append("Gerado em,").append(report.generatedAt()).append("\n\n");
 
         csv.append("Resumo\n");
-        csv.append("Atendimentos,Entraram em espera,Em atendimento,Concluidos,Service Level,Tempo medio atendimento segundos\n");
+        csv.append("Atendimentos,Entraram em espera,Service Level,Tempo medio atendimento minutos\n");
         csv.append(report.totalServiceRequests()).append(",")
                 .append(report.waitedServiceRequests()).append(",")
-                .append(report.inProgressServiceRequests()).append(",")
-                .append(report.completedServiceRequests()).append(",")
                 .append(formatNumber(report.serviceLevel())).append(",")
-                .append(formatNumber(report.averageServiceSeconds())).append("\n\n");
+                .append(formatNumber(report.averageServiceSeconds() / 60.0)).append("\n\n");
 
         csv.append("Categorias\n");
-        csv.append("Categoria,Atendimentos,Entraram em espera,Em atendimento,Concluidos,Tempo medio atendimento segundos\n");
-        report.categories().forEach(category -> csv.append(category.category()).append(",")
+        csv.append("Categoria,Atendimentos,Entraram em espera,Tempo medio atendimento minutos\n");
+        report.categories().forEach(category -> csv.append(getCategoryLabel(category.category())).append(",")
                 .append(category.totalServiceRequests()).append(",")
                 .append(category.waitedServiceRequests()).append(",")
-                .append(category.inProgressServiceRequests()).append(",")
-                .append(category.completedServiceRequests()).append(",")
-                .append(formatNumber(category.averageServiceSeconds())).append("\n"));
+                .append(formatNumber(category.averageServiceSeconds() / 60.0)).append("\n"));
 
         csv.append("\nAgentes\n");
-        csv.append("Badge,Agente,Atendimentos,Tempo medio atendimento segundos,Pausas,Tempo total pausa segundos\n");
+        csv.append("Badge,Agente,Atendimentos,Tempo medio atendimento minutos,Pausas,Tempo medio pausa minutos por dia\n");
         report.attendants().forEach(attendant -> csv.append(escapeCsv(attendant.attendantBadge())).append(",")
                 .append(escapeCsv(attendant.attendantName())).append(",")
                 .append(attendant.serviceRequests()).append(",")
-                .append(formatNumber(attendant.averageServiceSeconds())).append(",")
+                .append(formatNumber(attendant.averageServiceSeconds() / 60.0)).append(",")
                 .append(attendant.pauseCount()).append(",")
-                .append(formatNumber(attendant.totalPauseSeconds())).append("\n"));
+                .append(formatNumber(attendant.totalPauseSeconds() / 60.0 / daysDifference)).append("\n"));
+
+        csv.append("\nHistorico Diario\n");
+        csv.append("Data,Atendimentos,Entraram em espera,Service Level,Tempo medio atendimento minutos\n");
+
+        List<DailyStatisticsResponse> dailyStats = buildDailyStatistics(startDate, endDate);
+        dailyStats.forEach(day -> csv.append(day.date()).append(",")
+                .append(day.totalServiceRequests()).append(",")
+                .append(day.waitedServiceRequests()).append(",")
+                .append(formatNumber(day.serviceLevel())).append(",")
+                .append(formatNumber(day.averageServiceSeconds() / 60.0)).append("\n"));
 
         return csv.toString();
     }
@@ -193,5 +204,57 @@ public class ReportService {
             return "";
         }
         return "\"" + value.replace("\"", "\"\"") + "\"";
+    }
+
+    private String getCategoryLabel(ServiceCategory category) {
+        return switch (category) {
+            case CARD_ISSUES -> "Problemas com cartão";
+            case LOAN_CONTRACTING -> "Contratação de empréstimo";
+            case OTHER_SUBJECTS -> "Outros assuntos";
+        };
+    }
+
+    private long calculateDaysDifference(LocalDate startDate, LocalDate endDate) {
+        return java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1;
+    }
+
+    private List<DailyStatisticsResponse> buildDailyStatistics(LocalDate startDate, LocalDate endDate) {
+        List<DailyStatisticsResponse> dailyStats = new java.util.ArrayList<>();
+        LocalDate currentDate = startDate;
+
+        while (!currentDate.isAfter(endDate)) {
+            Instant dayStart = currentDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
+            Instant dayEnd = currentDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+            List<ServiceRequest> dayRequests = serviceRequestRepository.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(dayStart, dayEnd);
+
+            long dayTotal = dayRequests.size();
+            long dayWaited = dayRequests.stream().filter(r -> r.getQueuedAt() != null).count();
+            double dayServiceLevel = calculateServiceLevel(dayTotal, dayWaited);
+            double dayAverage = averageCompletedSeconds(dayRequests);
+
+            dailyStats.add(new DailyStatisticsResponse(currentDate, dayTotal, dayWaited, dayServiceLevel, dayAverage));
+            currentDate = currentDate.plusDays(1);
+        }
+
+        return dailyStats;
+    }
+
+    private List<WorstServiceLevelDayResponse> buildWorstDaysReport(List<ServiceRequest> requests) {
+        return requests.stream()
+                .filter(request -> request.getCreatedAt() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        request -> request.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate()
+                ))
+                .entrySet().stream()
+                .map(entry -> {
+                    List<ServiceRequest> dayRequests = entry.getValue();
+                    long dayTotal = dayRequests.size();
+                    long dayWaited = dayRequests.stream().filter(r -> r.getQueuedAt() != null).count();
+                    double dayServiceLevel = calculateServiceLevel(dayTotal, dayWaited);
+                    return new WorstServiceLevelDayResponse(entry.getKey(), dayServiceLevel);
+                })
+                .sorted((a, b) -> Double.compare(a.serviceLevel(), b.serviceLevel()))
+                .limit(3)
+                .toList();
     }
 }

@@ -40,7 +40,7 @@ public class ReportController {
         return ResponseEntity.ok(reportService.getPeriodReport(resolvedStartDate, resolvedEndDate));
     }
 
-    @GetMapping(value = "/daily.csv", produces = "text/csv")
+    @GetMapping(value = "/daily.csv", produces = "text/csv;charset=UTF-8")
     public ResponseEntity<String> dailyCsv(
             @RequestParam(value = "date", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -56,8 +56,8 @@ public class ReportController {
         LocalDate resolvedEndDate = endDate != null ? endDate : resolvedStartDate;
         String filename = "flowpay-relatorio-" + resolvedStartDate + "_" + resolvedEndDate + ".csv";
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(new MediaType("text", "csv"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + filename)
+                .header(HttpHeaders.CONTENT_TYPE, "text/csv;charset=UTF-8")
                 .body(reportService.getPeriodReportCsv(resolvedStartDate, resolvedEndDate));
     }
 }

@@ -27,7 +27,7 @@ axiosInstance.interceptors.response.use(
   (error: AxiosError) => {
     const data = error.response?.data as { detail?: string; title?: string } | undefined;
     const message = data?.detail || data?.title || error.response?.statusText || error.message;
-    return Promise.reject(new Error(`HTTP Error: ${message}`));
+    return Promise.reject(new Error(message));
   }
 );
 

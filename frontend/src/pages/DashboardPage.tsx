@@ -48,6 +48,82 @@ function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function getDaysDifference(startDate: string, endDate: string): number {
+  const start = new Date(startDate).getTime();
+  const end = new Date(endDate).getTime();
+  return Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function getCurrentMonth() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = "01";
+  return `${year}-${month}-${day}`;
+}
+
+function getMonthEnd() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+
+interface Quarter {
+  name: string;
+  startMonth: number;
+  endMonth: number;
+}
+
+const QUARTERS: Quarter[] = [
+  { name: "Q1", startMonth: 2, endMonth: 4 },
+  { name: "Q2", startMonth: 5, endMonth: 7 },
+  { name: "Q3", startMonth: 8, endMonth: 10 },
+  { name: "Q4", startMonth: 11, endMonth: 1 },
+];
+
+function getQuarterDates(quarter: Quarter): { start: string; end: string } | null {
+  const today = new Date();
+  const currentMonth = today.getMonth() + 1;
+  const currentYear = today.getFullYear();
+  let startYear = currentYear;
+  let endYear = currentYear;
+
+  if (quarter.endMonth < quarter.startMonth) {
+    if (currentMonth >= quarter.startMonth) {
+      endYear = currentYear + 1;
+    } else {
+      startYear = currentYear - 1;
+    }
+  }
+
+  const startDate = `${startYear}-${String(quarter.startMonth).padStart(2, "0")}-01`;
+  const endDate = `${endYear}-${String(quarter.endMonth).padStart(2, "0")}-${new Date(endYear, quarter.endMonth, 0).getDate()}`;
+
+  return { start: startDate, end: endDate };
+}
+
+function isQuarterActive(quarter: Quarter): boolean {
+  const today = new Date();
+  const currentMonth = today.getMonth() + 1;
+
+  if (quarter.endMonth < quarter.startMonth) {
+    return currentMonth >= quarter.startMonth || currentMonth <= quarter.endMonth;
+  }
+  return currentMonth >= quarter.startMonth && currentMonth <= quarter.endMonth;
+}
+
+function hasQuarterPassed(quarter: Quarter): boolean {
+  const today = new Date();
+  const currentMonth = today.getMonth() + 1;
+
+  if (quarter.endMonth < quarter.startMonth) {
+    return currentMonth > quarter.endMonth && currentMonth < quarter.startMonth;
+  }
+  return currentMonth > quarter.endMonth;
+}
+
 export function DashboardPage() {
   const { summary, status } = useDashboardSse();
   const [attendants, setAttendants] = useState<AttendantResponse[]>([]);
@@ -226,7 +302,7 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-200">
+    <div className="min-h-screen bg-slate-300">
       <header className="border-b border-slate-300 bg-white shadow-md">
         <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -261,16 +337,16 @@ export function DashboardPage() {
             <button
               type="button"
               onClick={() => setFormPanel((current) => (current === "service" ? null : "service"))}
-              className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100"
+              className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100"
             >
               Novo atendimento
             </button>
             <button
               type="button"
               onClick={() => setFormPanel((current) => (current === "agent" ? null : "agent"))}
-              className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 shadow-sm transition hover:bg-blue-100"
+              className="rounded-lg border border-blue-300 bg-blue-100 px-4 py-3 text-sm font-semibold text-blue-800 shadow-sm transition hover:bg-blue-200"
             >
-              Novo agente
+              Logar agente
             </button>
           </div>
 
@@ -461,10 +537,10 @@ export function DashboardPage() {
                           ) : (
                             <div className="flex flex-wrap gap-2">
                               <button onClick={() => startEdit(attendant)} className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700">Editar</button>
-                              <button onClick={() => togglePause(attendant)} disabled={(attendant.status !== "AVAILABLE" && attendant.status !== "PAUSED") || pauseActionId === attendant.id} className="rounded bg-amber-500 px-2 py-1 text-xs text-white hover:bg-amber-600 disabled:bg-slate-300">
+                              <button onClick={() => togglePause(attendant)} disabled={(attendant.status !== "AVAILABLE" && attendant.status !== "PAUSED") || pauseActionId === attendant.id} className={`rounded px-2 py-1 text-xs text-white ${attendant.status === "PAUSED" ? "bg-green-600 hover:bg-green-700" : "bg-amber-500 hover:bg-amber-600"} disabled:bg-slate-300`}>
                                 {pauseActionId === attendant.id ? "..." : attendant.status === "PAUSED" ? "Voltar" : "Pausa"}
                               </button>
-                              <button onClick={() => { setAttendantError(null); setEditingId(null); setConfirmDeleteId(attendant.id); }} className="rounded bg-rose-600 px-2 py-1 text-xs text-white hover:bg-rose-700">Excluir</button>
+                              <button onClick={() => { setAttendantError(null); setEditingId(null); setConfirmDeleteId(attendant.id); }} className="rounded bg-rose-600 px-2 py-1 text-xs text-white hover:bg-rose-700">Deslogar</button>
                             </div>
                           )}
                         </td>
@@ -493,7 +569,7 @@ export function DashboardPage() {
                     <th className="px-3 py-2 text-center">Atendimentos</th>
                     <th className="px-3 py-2 text-center">Tempo médio</th>
                     <th className="px-3 py-2 text-center">Pausas</th>
-                    <th className="px-3 py-2 text-center">Tempo em pausa</th>
+                    <th className="px-3 py-2 text-center">Tempo médio por dia</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white">
@@ -517,53 +593,107 @@ export function DashboardPage() {
             title="Relatórios gerenciais"
             description="Visão consolidada para acompanhamento de desempenho e exportação para análise."
             right={
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                  Início
-                  <input
-                    type="date"
-                    value={reportStartDate}
-                    onChange={(event) => setReportStartDate(event.target.value)}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-700"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                  Fim
-                  <input
-                    type="date"
-                    value={reportEndDate}
-                    onChange={(event) => setReportEndDate(event.target.value)}
-                    className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-700"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={exportDailyReport}
-                  className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 sm:self-end"
-                >
-                  Exportar CSV
-                </button>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportStartDate(getCurrentMonth());
+                      setReportEndDate(getMonthEnd());
+                    }}
+                    className="rounded border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    Mês atual
+                  </button>
+                  {QUARTERS.map((quarter) => {
+                    const dates = getQuarterDates(quarter);
+                    const isDisabled = !isQuarterActive(quarter) && hasQuarterPassed(quarter);
+                    return (
+                      <button
+                        key={quarter.name}
+                        type="button"
+                        onClick={() => {
+                          if (dates) {
+                            setReportStartDate(dates.start);
+                            setReportEndDate(dates.end);
+                          }
+                        }}
+                        disabled={isDisabled}
+                        className={`rounded border px-3 py-1 text-xs font-medium ${
+                          isDisabled
+                            ? "border-slate-200 bg-slate-100 text-slate-400"
+                            : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        {quarter.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                    Início
+                    <input
+                      type="date"
+                      value={reportStartDate}
+                      max={reportEndDate}
+                      onChange={(event) => {
+                        const newStart = event.target.value;
+                        setReportStartDate(newStart);
+                      }}
+                      className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-700"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                    Fim
+                    <input
+                      type="date"
+                      value={reportEndDate}
+                      min={reportStartDate}
+                      onChange={(event) => {
+                        const newEnd = event.target.value;
+                        setReportEndDate(newEnd);
+                      }}
+                      className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-700"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={exportDailyReport}
+                    className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 sm:self-end"
+                  >
+                    Exportar CSV
+                  </button>
+                </div>
               </div>
             }
           >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <StatCard label="Atendimentos" value={dailyReport?.totalServiceRequests ?? "-"} />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard label="Atendimentos no período" value={dailyReport?.totalServiceRequests ?? "-"} />
               <StatCard label="Entraram em espera" value={dailyReport?.waitedServiceRequests ?? "-"} />
-              <StatCard label="Em atendimento" value={dailyReport?.inProgressServiceRequests ?? "-"} />
-              <StatCard label="Concluídos" value={dailyReport?.completedServiceRequests ?? "-"} />
-              <StatCard label="Tempo médio" value={dailyReport ? formatSeconds(dailyReport.averageServiceSeconds) : "-"} />
+              <StatCard label="Service Level" value={dailyReport ? formatServiceLevel(dailyReport.serviceLevel)  : "-"} />
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 sm:p-4">
+                <p className="text-xs font-semibold text-slate-600">Dias com piores Service Level</p>
+                <div className="mt-2 space-y-1">
+                  {dailyReport?.worstDays.map((day) => (
+                    <div key={day.date} className="text-sm text-slate-900">
+                      <span className="font-mono text-xs text-slate-500">{day.date}</span>
+                      <span className="ml-2 font-semibold">{formatServiceLevel(day.serviceLevel)}</span>
+                    </div>
+                  )) ?? <span className="text-sm text-slate-500">-</span>}
+                </div>
+              </div>
             </div>
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="w-full min-w-[620px] text-left text-sm">
+            <div className="mt-4 grid gap-4">
+              <div className="overflow-x-auto rounded-lg border border-slate-300">
+                <table className="w-full min-w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
-                      <th className="px-3 py-2">Categoria</th>
+                      <th className="px-3 py-2 w-32">Categoria</th>
                       <th className="px-3 py-2 text-center">Atendimentos</th>
-                      <th className="px-3 py-2 text-center">Em espera</th>
-                      <th className="px-3 py-2 text-center">Concluídos</th>
                       <th className="px-3 py-2 text-center">Tempo médio</th>
+                      <th className="px-3 py-2 text-center">Em espera Tempo médio</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white">
@@ -571,9 +701,8 @@ export function DashboardPage() {
                       <tr key={item.category} className="border-t border-slate-100">
                         <td className="px-3 py-2 font-medium text-slate-900">{serviceCategoryLabels[item.category]}</td>
                         <td className="px-3 py-2 text-center text-slate-600">{item.totalServiceRequests}</td>
-                        <td className="px-3 py-2 text-center text-slate-600">{item.waitedServiceRequests}</td>
-                        <td className="px-3 py-2 text-center text-slate-600">{item.completedServiceRequests}</td>
                         <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.averageServiceSeconds)}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{item.waitedServiceRequests}</td>
                       </tr>
                     ))}
                     {!dailyReport || reportLoading ? (
@@ -585,17 +714,18 @@ export function DashboardPage() {
                 </table>
               </div>
 
-              <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="w-full min-w-[620px] text-left text-sm">
+              <div className="overflow-x-auto rounded-lg border border-slate-300">
+                <table className="w-full min-w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
                       <th className="px-3 py-2">Agente</th>
                       <th className="px-3 py-2 text-center">Atendimentos</th>
                       <th className="px-3 py-2 text-center">Tempo médio</th>
                       <th className="px-3 py-2 text-center">Pausas</th>
-                      <th className="px-3 py-2 text-center">Tempo em pausa</th>
+                      <th className="px-3 py-2 text-center">Tempo médio por dia</th>
                     </tr>
                   </thead>
+                  
                   <tbody className="bg-white">
                     {dailyReport?.attendants.map((item) => (
                       <tr key={item.attendantId} className="border-t border-slate-100">
@@ -603,7 +733,7 @@ export function DashboardPage() {
                         <td className="px-3 py-2 text-center text-slate-600">{item.serviceRequests}</td>
                         <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.averageServiceSeconds)}</td>
                         <td className="px-3 py-2 text-center text-slate-600">{item.pauseCount}</td>
-                        <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.totalPauseSeconds)}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.totalPauseSeconds / getDaysDifference(reportStartDate, reportEndDate))}</td>
                       </tr>
                     ))}
                     {!dailyReport || reportLoading ? (

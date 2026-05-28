@@ -15,6 +15,8 @@ public record DailyReportResponse(
         double serviceLevel,
         double averageServiceSeconds,
         List<CategoryReportResponse> categories,
-        List<AttendantDailySummaryResponse> attendants
+        List<AttendantDailySummaryResponse> attendants,
+        List<WorstServiceLevelDayResponse> worstDays
 ) {
 }
+
