@@ -14,8 +14,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.Comparator;
 
 @Service
 public class ServiceRequestService {
@@ -59,6 +62,7 @@ public class ServiceRequestService {
         } else {
             serviceRequest.setStatus(ServiceRequestStatus.WAITING);
             serviceRequest.setAttendant(null);
+            serviceRequest.setQueuedAt(Instant.now());
             saved = serviceRequestRepository.save(serviceRequest);
         }
 
@@ -112,7 +116,34 @@ public class ServiceRequestService {
     }
 
     private Optional<Attendant> findEligibleAttendant(ServiceCategory category) {
-        return attendantRepository.findEligible(category).stream().findFirst();
+        Instant startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant endOfDay = LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+
+        return attendantRepository.findEligible(category)
+                .stream()
+                .min(Comparator
+                        .comparingLong((Attendant attendant) -> activeRequestsCount(attendant.getId()) == 0 ? 0 : 1)
+                        .thenComparing(
+                                attendant -> activeRequestsCount(attendant.getId()) == 0 && attendant.getAvailableSince() != null
+                                        ? attendant.getAvailableSince()
+                                        : Instant.EPOCH
+                        )
+                        .thenComparingLong(attendant ->
+                                serviceRequestRepository.countByAttendantIdAndCreatedAtBetween(
+                                        attendant.getId(),
+                                        startOfDay,
+                                        endOfDay
+                                )
+                        )
+                        .thenComparingLong(attendant -> activeRequestsCount(attendant.getId()))
+                        .thenComparing(Attendant::getId));
+    }
+
+    private long activeRequestsCount(Long attendantId) {
+        return serviceRequestRepository.countByAttendantIdAndStatus(
+                attendantId,
+                ServiceRequestStatus.IN_PROGRESS
+        );
     }
 
     private void assignToAttendant(ServiceRequest serviceRequest, Attendant attendant) {
@@ -121,7 +152,7 @@ public class ServiceRequestService {
         serviceRequest.setStartedAt(Instant.now());
     }
 
-    // Mantem o status do atendente coerente com a quantidade real de atendimentos em aberto.
+    // Mantem o status do agente coerente com a quantidade real de atendimentos em aberto.
     private void refreshAttendantStatus(Attendant attendant) {
         long openCount = serviceRequestRepository.countByAttendantIdAndStatus(
                 attendant.getId(),

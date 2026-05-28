@@ -13,6 +13,8 @@ export const api = {
     update: (id: number, body: { name: string; categories: string[] }) =>
       httpPut<AttendantResponse, typeof body>(`/api/attendants/${id}`, body),
     delete: (id: number) => httpDelete(`/api/attendants/${id}`),
+    pause: (id: number) => httpPatch<AttendantResponse>(`/api/attendants/${id}/pause`),
+    resume: (id: number) => httpPatch<AttendantResponse>(`/api/attendants/${id}/resume`),
   },
   serviceRequests: {
     list: () => httpGet<ServiceRequestResponse[]>("/api/service-requests"),

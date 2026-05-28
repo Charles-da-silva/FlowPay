@@ -1,4 +1,4 @@
-package com.flowpay.atendimento.interfaces.Controllers;
+package com.flowpay.atendimento.interfaces.controller;
 
 import com.flowpay.atendimento.application.dto.DashboardSummaryResponse;
 import com.flowpay.atendimento.application.service.DashboardService;
@@ -24,7 +24,7 @@ public class DashboardController {
 
     @GetMapping("/summary")
     public ResponseEntity<DashboardSummaryResponse> summary() {
-        // Endpoint de visao executiva: capacidade de atendentes + situacao da fila.
+        // Endpoint de visao executiva: capacidade de agentes + situacao da fila.
         return ResponseEntity.ok(dashboardService.getSummary());
     }
 

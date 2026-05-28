@@ -7,6 +7,17 @@ interface CreateServiceRequestFormProps {
   onSuccess?: () => void;
 }
 
+const namePattern = /^[\p{L} ]+$/u;
+
+function normalizeName(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function isValidPersonName(value: string) {
+  const normalized = normalizeName(value);
+  return normalized.length >= 2 && namePattern.test(normalized);
+}
+
 export function CreateServiceRequestForm({ onSuccess }: CreateServiceRequestFormProps) {
   const [customerName, setCustomerName] = useState("");
   const [category, setCategory] = useState<ServiceCategory>("CARD_ISSUES");
@@ -21,15 +32,15 @@ export function CreateServiceRequestForm({ onSuccess }: CreateServiceRequestForm
     setError(null);
     setSuccess(null);
 
-    if (!customerName.trim()) {
-      setError("Nome do cliente é obrigatório");
+    if (!isValidPersonName(customerName)) {
+      setError("Use apenas letras e espaços no nome do cliente.");
       return;
     }
 
     setLoading(true);
     try {
       const result = await api.serviceRequests.create({
-        customerName: customerName.trim(),
+        customerName: normalizeName(customerName),
         category,
       });
       setSuccess(result);
@@ -37,7 +48,7 @@ export function CreateServiceRequestForm({ onSuccess }: CreateServiceRequestForm
       setTimeout(() => setSuccess(null), 4000);
       onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao criar atendimento");
+      setError(err instanceof Error ? err.message : "Erro ao criar atendimento.");
     } finally {
       setLoading(false);
     }
@@ -80,7 +91,7 @@ export function CreateServiceRequestForm({ onSuccess }: CreateServiceRequestForm
         <div className="rounded bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           {success.attendantId
             ? `Atribuído a ${success.attendantName}.`
-            : "Adicionado à fila: não há atendente disponível."}
+            : "Adicionado à fila: não há agente disponível."}
         </div>
       )}
 

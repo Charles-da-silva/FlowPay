@@ -7,6 +7,17 @@ interface CreateAttendantFormProps {
   onSuccess?: () => void;
 }
 
+const namePattern = /^[\p{L} ]+$/u;
+
+function normalizeName(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function isValidPersonName(value: string) {
+  const normalized = normalizeName(value);
+  return normalized.length >= 2 && namePattern.test(normalized);
+}
+
 export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
   const [name, setName] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<ServiceCategory[]>([]);
@@ -27,26 +38,26 @@ export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
     setError(null);
     setSuccess(false);
 
-    if (!name.trim()) {
-      setError("Nome do atendente é obrigatório");
+    if (!isValidPersonName(name)) {
+      setError("Use apenas letras e espaços no nome do agente.");
       return;
     }
 
     if (selectedCategories.length === 0) {
-      setError("Selecione pelo menos uma categoria");
+      setError("Selecione pelo menos uma categoria.");
       return;
     }
 
     setLoading(true);
     try {
-      await api.attendants.create({ name: name.trim(), categories: selectedCategories });
+      await api.attendants.create({ name: normalizeName(name), categories: selectedCategories });
       setSuccess(true);
       setName("");
       setSelectedCategories([]);
       setTimeout(() => setSuccess(false), 3000);
       onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao criar atendente");
+      setError(err instanceof Error ? err.message : "Erro ao criar agente.");
     } finally {
       setLoading(false);
     }
@@ -54,7 +65,7 @@ export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-slate-900">Criar novo atendente</h3>
+      <h3 className="text-sm font-semibold text-slate-900">Criar novo agente</h3>
 
       <div>
         <label className="block text-sm font-medium text-slate-700">Nome</label>
@@ -89,7 +100,7 @@ export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
       {error && <div className="rounded bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
       {success && (
         <div className="rounded bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          Atendente criado com sucesso.
+          Agente criado com sucesso.
         </div>
       )}
 
@@ -98,7 +109,7 @@ export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
         disabled={loading}
         className="w-full rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-slate-400"
       >
-        {loading ? "Criando..." : "Criar atendente"}
+        {loading ? "Criando..." : "Criar agente"}
       </button>
     </form>
   );

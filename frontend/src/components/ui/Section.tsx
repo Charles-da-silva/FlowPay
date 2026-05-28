@@ -9,7 +9,7 @@ type Props = {
 
 export function Section({ title, description, children, right }: Props) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm ring-1 ring-white">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
@@ -21,4 +21,3 @@ export function Section({ title, description, children, right }: Props) {
     </section>
   );
 }
-

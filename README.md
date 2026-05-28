@@ -1,21 +1,26 @@
 # FlowPay - Distribuição e Monitoramento de Atendimentos
 
-Aplicação full stack desenvolvida para o desafio técnico da FlowPay. O sistema distribui atendimentos entre atendentes por categoria, respeita limite de atendimentos simultâneos e oferece um dashboard para acompanhamento em tempo real.
+Aplicação full stack desenvolvida para o desafio técnico da FlowPay. O sistema distribui atendimentos entre agentes por categoria, respeita limite de atendimentos simultâneos e oferece um painel de monitoramento de fila em tempo real.
 
 ## Funcionalidades
 
-- Cadastro, edição e exclusão de atendentes.
-- Associação de atendentes a uma ou mais categorias:
+- Cadastro, edição, exclusão, pausa e retorno de agentes.
+- Associação de agentes a uma ou mais categorias:
   - Problemas com cartão
   - Contratação de empréstimo
   - Outros assuntos
 - Criação de atendimentos por categoria.
-- Distribuição automática para atendente elegível com menor carga.
-- Limite de 3 atendimentos simultâneos por atendente.
-- Fila de espera quando todos os atendentes elegíveis estão no limite.
+- Distribuição automática para agente elegível.
+- Limite de 3 atendimentos simultâneos por agente.
+- Fila de espera quando todos os agentes elegíveis estão no limite.
 - Redistribuição automática da fila quando um atendimento é finalizado.
-- Dashboard com atualização em tempo real via Server-Sent Events (SSE).
-- Visualização de atendimentos em andamento, fila, status e carga atual dos atendentes.
+- Painel com atualização em tempo real via Server-Sent Events (SSE).
+- Resumo do dia com Service Level, total de atendimentos e clientes que entraram em espera.
+- Indicadores operacionais de agentes logados, disponíveis, ocupados, clientes na fila e clientes em atendimento.
+- Controle de pausa para agentes disponíveis, com contador de tempo em pausa.
+- Histórico dos agentes com atendimentos do dia, tempo médio de atendimento, número de pausas e tempo total em pausa.
+- Validação de nomes para aceitar apenas letras e espaços.
+- Layout responsivo para desktop e smartphone.
 
 ## Stack
 
@@ -46,8 +51,21 @@ Aplicação full stack desenvolvida para o desafio técnico da FlowPay. O sistem
 ```text
 flowpay-system/
   backend/    API REST, regra de distribuição, persistência e SSE
-  frontend/   Dashboard React para operação e monitoramento
+  frontend/   Painel React para operação e monitoramento
 ```
+
+## Organização do back-end
+
+O back-end segue uma separação por responsabilidades:
+
+```text
+application/  Casos de uso, DTOs e mapeadores
+domain/       Entidades, enums e repositórios
+interfaces/   Controllers REST e tratamento de erros
+shared/       Exceções e recursos compartilhados
+```
+
+Essa estrutura se aproxima de uma organização em camadas/clean architecture. Em Java, os pacotes usam nomes em minúsculo por convenção, por exemplo `interfaces.controller`.
 
 ## Como rodar localmente
 
@@ -97,7 +115,7 @@ npm install
 npm run dev
 ```
 
-Dashboard disponível em:
+Painel disponível em:
 
 ```text
 http://localhost:5173
@@ -123,20 +141,24 @@ VITE_API_BASE_URL=http://localhost:8080
 ## Regras de distribuição
 
 1. O atendimento é criado com uma categoria.
-2. O back-end procura atendentes que atendem aquela categoria e ainda possuem capacidade.
-3. O atendimento é atribuído ao atendente elegível com menor número de atendimentos em andamento.
-4. Se nenhum atendente elegível tiver capacidade, o atendimento entra na fila.
-5. Quando um atendimento é finalizado, o sistema tenta redistribuir automaticamente o próximo item da fila da mesma categoria.
+2. O back-end procura agentes que atendem aquela categoria e ainda possuem capacidade.
+3. Agentes em pausa ou inativos não recebem novos atendimentos.
+4. Se houver agentes sem atendimento em andamento, o atendimento vai para quem está disponível há mais tempo.
+5. Se todos os agentes elegíveis já estiverem atendendo, mas ainda houver capacidade, o atendimento vai para quem recebeu menos atendimentos no dia.
+6. Se nenhum agente elegível tiver capacidade, o atendimento entra na fila e o Service Level do dia é impactado.
+7. Quando um atendimento é finalizado, o sistema tenta redistribuir automaticamente o próximo item da fila da mesma categoria.
 
 ## Endpoints principais
 
-### Atendentes
+### Agentes
 
 ```http
 GET    /api/attendants
 POST   /api/attendants
 PUT    /api/attendants/{id}
 DELETE /api/attendants/{id}
+PATCH  /api/attendants/{id}/pause
+PATCH  /api/attendants/{id}/resume
 ```
 
 ### Atendimentos
@@ -155,11 +177,11 @@ GET /api/dashboard/summary
 GET /api/dashboard/stream
 ```
 
-O endpoint `/api/dashboard/stream` usa SSE para enviar atualizações em tempo real ao dashboard.
+O endpoint `/api/dashboard/stream` usa SSE para enviar atualizações em tempo real ao painel.
 
 ## Exemplos de payload
 
-### Criar atendente
+### Criar agente
 
 ```json
 {
@@ -195,7 +217,8 @@ npm run build
 
 ## Observações técnicas
 
-- O Flyway versiona a estrutura inicial do banco e dados de exemplo.
-- O status do atendente é recalculado com base na quantidade de atendimentos em andamento.
-- A exclusão de atendente é bloqueada quando há atendimentos em andamento para evitar inconsistência operacional.
-- O dashboard combina chamadas REST com SSE para manter a tela atualizada em tempo real.
+- O Flyway versiona a estrutura inicial do banco, dados de exemplo e evoluções de métricas/pausas.
+- O status do agente é recalculado com base na quantidade de atendimentos em andamento.
+- A exclusão de agente é bloqueada quando há atendimentos em andamento para evitar inconsistência operacional.
+- As pausas são registradas em tabela própria para permitir histórico diário.
+- O painel combina chamadas REST com SSE para manter a tela atualizada em tempo real.

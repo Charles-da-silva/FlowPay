@@ -1,4 +1,4 @@
-package com.flowpay.atendimento.interfaces.Controllers;
+package com.flowpay.atendimento.interfaces.controller;
 
 import com.flowpay.atendimento.application.dto.CreateServiceRequestRequest;
 import com.flowpay.atendimento.application.dto.ServiceRequestResponse;

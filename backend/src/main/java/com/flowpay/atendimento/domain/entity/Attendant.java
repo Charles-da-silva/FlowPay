@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -46,11 +47,17 @@ public class Attendant {
     @Column(nullable = false, length = 20)
     private AttendantStatus status;
 
-    // Limite de atendimentos simultaneos por atendente.
+    // Limite de atendimentos simultaneos por agente.
     @Column(name = "max_simultaneous_customers", nullable = false)
     private Integer maxSimultaneousCustomers = 3;
 
-    // Categorias que o atendente pode atender.
+    @Column(name = "available_since")
+    private Instant availableSince;
+
+    @Column(name = "paused_since")
+    private Instant pausedSince;
+
+    // Categorias que o agente pode atender.
     @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "attendant_categories", joinColumns = @JoinColumn(name = "attendant_id"))

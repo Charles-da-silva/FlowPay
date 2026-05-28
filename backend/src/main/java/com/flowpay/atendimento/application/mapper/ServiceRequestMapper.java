@@ -19,7 +19,8 @@ public class ServiceRequestMapper {
                 attendantName,
                 serviceRequest.getCreatedAt(),
                 serviceRequest.getStartedAt(),
-                serviceRequest.getFinishedAt()
+                serviceRequest.getFinishedAt(),
+                serviceRequest.getQueuedAt()
         );
     }
 }

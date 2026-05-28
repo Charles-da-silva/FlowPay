@@ -46,7 +46,7 @@ public class ServiceRequest {
     @Column(nullable = false, length = 20)
     private ServiceRequestStatus status;
 
-    // N:1 -> varios chamados podem estar alocados ao mesmo atendente.
+    // N:1 -> varios chamados podem estar alocados ao mesmo agente.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "attendant_id")
     private Attendant attendant;
@@ -59,4 +59,7 @@ public class ServiceRequest {
 
     @Column(name = "finished_at")
     private Instant finishedAt;
+
+    @Column(name = "queued_at")
+    private Instant queuedAt;
 }

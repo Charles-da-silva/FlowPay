@@ -17,6 +17,7 @@ public interface AttendantRepository extends JpaRepository<Attendant, Long> {
     @Query("""
         select a from Attendant a
         where a.status <> com.flowpay.atendimento.domain.enums.AttendantStatus.INACTIVE
+          and a.status <> com.flowpay.atendimento.domain.enums.AttendantStatus.PAUSED
           and :category member of a.categories
           and (
             select count(sr)

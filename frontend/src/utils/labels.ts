@@ -9,6 +9,7 @@ export const serviceCategoryLabels: Record<ServiceCategory, string> = {
 export const attendantStatusLabels: Record<AttendantStatus, string> = {
   AVAILABLE: "Disponível",
   BUSY: "Ocupado",
+  PAUSED: "Em pausa",
   INACTIVE: "Inativo",
 };
 

@@ -14,6 +14,7 @@ public record ServiceRequestResponse(
         String attendantName,
         Instant createdAt,
         Instant startedAt,
-        Instant finishedAt
+        Instant finishedAt,
+        Instant queuedAt
 ) {
 }
