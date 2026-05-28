@@ -701,7 +701,7 @@ export function DashboardPage() {
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                    Início: <span className="text-slate-900 font-semibold">{formatDateDisplay(reportStartDate)}</span>
+                    Início: <span className="text-slate-900 font-semibold"></span>
                     <input
                       type="date"
                       value={reportStartDate}
@@ -717,7 +717,7 @@ export function DashboardPage() {
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                    Fim: <span className="text-slate-900 font-semibold">{formatDateDisplay(reportEndDate)}</span>
+                    Fim: <span className="text-slate-900 font-semibold"></span>
                     <input
                       type="date"
                       value={reportEndDate}
