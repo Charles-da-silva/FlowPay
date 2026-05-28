@@ -1,6 +1,6 @@
 # FlowPay - Distribuição e Monitoramento de Atendimentos
 
-Aplicação full stack desenvolvida para o desafio técnico da FlowPay. O sistema distribui atendimentos entre agentes por categoria, respeita limite de atendimentos simultâneos e oferece um painel de monitoramento de fila em tempo real.
+Aplicação full stack desenvolvida para o desafio técnico da Ubots. O sistema distribui atendimentos entre agentes por categoria, respeita limite de atendimentos simultâneos e oferece um painel de monitoramento de fila em tempo real.
 
 ## Funcionalidades
 
@@ -26,7 +26,7 @@ Aplicação full stack desenvolvida para o desafio técnico da FlowPay. O sistem
 
 ### Back-end
 
-- Java 21
+- Java 25
 - Spring Boot 3.3.5
 - Spring Web
 - Spring Data JPA
