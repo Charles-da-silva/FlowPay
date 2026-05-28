@@ -45,7 +45,31 @@ function isValidPersonName(value: string) {
 }
 
 function todayInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  return formatDateInput(new Date());
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function clampDateToToday(date: string) {
+  const today = todayInputValue();
+  return date > today ? today : date;
+}
+
+function normalizeReportRange(startDate: string, endDate: string) {
+  const today = todayInputValue();
+  const safeStart = clampDateToToday(startDate);
+  const safeEnd = clampDateToToday(endDate);
+
+  if (safeStart > safeEnd) {
+    return { start: today, end: today };
+  }
+
+  return { start: safeStart, end: safeEnd };
 }
 
 function getDaysDifference(startDate: string, endDate: string): number {
@@ -72,7 +96,11 @@ function getMonthEnd() {
   const year = today.getFullYear();
   const month = today.getMonth() + 1;
   const lastDay = new Date(year, month, 0).getDate();
-  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  const monthEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  // Cap to today if month end is in the future
+  const today_str = todayInputValue();
+  return monthEnd > today_str ? today_str : monthEnd;
 }
 
 interface Quarter {
@@ -103,8 +131,14 @@ function getQuarterDates(quarter: Quarter): { start: string; end: string } | nul
     }
   }
 
-  const startDate = `${startYear}-${String(quarter.startMonth).padStart(2, "0")}-01`;
-  const endDate = `${endYear}-${String(quarter.endMonth).padStart(2, "0")}-${new Date(endYear, quarter.endMonth, 0).getDate()}`;
+  let startDate = `${startYear}-${String(quarter.startMonth).padStart(2, "0")}-01`;
+  let endDate = `${endYear}-${String(quarter.endMonth).padStart(2, "0")}-${new Date(endYear, quarter.endMonth, 0).getDate()}`;
+
+  // Cap end date to today if it's in the future
+  const today_str = todayInputValue();
+  if (endDate > today_str) {
+    endDate = today_str;
+  }
 
   return { start: startDate, end: endDate };
 }
@@ -124,9 +158,11 @@ function hasQuarterPassed(quarter: Quarter): boolean {
   const currentMonth = today.getMonth() + 1;
 
   if (quarter.endMonth < quarter.startMonth) {
+    // Q4: Nov-Jan, should be disabled only if we're between Feb-Oct
     return currentMonth > quarter.endMonth && currentMonth < quarter.startMonth;
   }
-  return currentMonth > quarter.endMonth;
+  // Regular quarters: should only be disabled if we haven't reached the start month yet
+  return currentMonth < quarter.startMonth;
 }
 
 export function DashboardPage() {
@@ -637,7 +673,7 @@ export function DashboardPage() {
                   </button>
                   {QUARTERS.map((quarter) => {
                     const dates = getQuarterDates(quarter);
-                    const isDisabled = !isQuarterActive(quarter) && hasQuarterPassed(quarter);
+                    const isDisabled = hasQuarterPassed(quarter);
                     return (
                       <button
                         key={quarter.name}
@@ -654,7 +690,7 @@ export function DashboardPage() {
                           selectedPeriodButton === quarter.name
                             ? "border-blue-600 bg-blue-100 text-blue-800"
                             : isDisabled
-                              ? "border-slate-200 bg-slate-100 text-slate-400"
+                              ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
                               : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
                         }`}
                       >
@@ -665,7 +701,7 @@ export function DashboardPage() {
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                    Início: {formatDateDisplay(reportStartDate)}
+                    Início: <span className="text-slate-900 font-semibold">{formatDateDisplay(reportStartDate)}</span>
                     <input
                       type="date"
                       value={reportStartDate}
@@ -681,7 +717,7 @@ export function DashboardPage() {
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                    Fim: {formatDateDisplay(reportEndDate)}
+                    Fim: <span className="text-slate-900 font-semibold">{formatDateDisplay(reportEndDate)}</span>
                     <input
                       type="date"
                       value={reportEndDate}
@@ -689,7 +725,7 @@ export function DashboardPage() {
                       max={todayInputValue()}
                       onChange={(event) => {
                         const newEnd = event.target.value;
-                        if (newEnd >= reportStartDate) {
+                        if (newEnd >= reportStartDate && newEnd <= todayInputValue()) {
                           setReportEndDate(newEnd);
                           setSelectedPeriodButton("custom");
                         }
