@@ -56,3 +56,26 @@ export interface DashboardSummaryResponse {
   todayServiceLevel: number;
   todayByAttendant: AttendantDailySummaryResponse[];
 }
+
+export interface CategoryReportResponse {
+  category: ServiceCategory;
+  totalServiceRequests: number;
+  waitedServiceRequests: number;
+  inProgressServiceRequests: number;
+  completedServiceRequests: number;
+  averageServiceSeconds: number;
+}
+
+export interface DailyReportResponse {
+  startDate: string;
+  endDate: string;
+  generatedAt: string;
+  totalServiceRequests: number;
+  waitedServiceRequests: number;
+  inProgressServiceRequests: number;
+  completedServiceRequests: number;
+  serviceLevel: number;
+  averageServiceSeconds: number;
+  categories: CategoryReportResponse[];
+  attendants: AttendantDailySummaryResponse[];
+}

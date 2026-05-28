@@ -2,6 +2,7 @@ import { httpDelete, httpGet, httpPatch, httpPost, httpPut } from "./http";
 import type {
   AttendantResponse,
   DashboardSummaryResponse,
+  DailyReportResponse,
   ServiceRequestResponse,
 } from "../types/api";
 
@@ -25,5 +26,9 @@ export const api = {
   },
   dashboard: {
     summary: () => httpGet<DashboardSummaryResponse>("/api/dashboard/summary"),
+  },
+  reports: {
+    daily: (startDate: string, endDate: string) =>
+      httpGet<DailyReportResponse>(`/api/reports/daily?startDate=${startDate}&endDate=${endDate}`),
   },
 };

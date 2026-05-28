@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
-import type { AttendantResponse, ServiceCategory, ServiceRequestResponse } from "../types/api";
+import { getApiBaseUrl } from "../services/http";
+import type { AttendantResponse, DailyReportResponse, ServiceCategory, ServiceRequestResponse } from "../types/api";
 import { useDashboardSse } from "../hooks/useDashboardSse";
 import { StatCard } from "../components/ui/StatCard";
 import { Section } from "../components/ui/Section";
@@ -43,6 +44,10 @@ function isValidPersonName(value: string) {
   return trimmed.length >= 2 && namePattern.test(trimmed);
 }
 
+function todayInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function DashboardPage() {
   const { summary, status } = useDashboardSse();
   const [attendants, setAttendants] = useState<AttendantResponse[]>([]);
@@ -61,6 +66,10 @@ export function DashboardPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [pauseActionId, setPauseActionId] = useState<number | null>(null);
   const [attendantError, setAttendantError] = useState<string | null>(null);
+  const [reportStartDate, setReportStartDate] = useState(todayInputValue());
+  const [reportEndDate, setReportEndDate] = useState(todayInputValue());
+  const [dailyReport, setDailyReport] = useState<DailyReportResponse | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const loadData = async () => {
     try {
@@ -79,9 +88,21 @@ export function DashboardPage() {
     }
   };
 
+  const loadDailyReport = async (startDate = reportStartDate, endDate = reportEndDate) => {
+    setReportLoading(true);
+    try {
+      setDailyReport(await api.reports.daily(startDate, endDate));
+    } catch (err) {
+      console.error("Erro ao carregar relatorio:", err);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   useEffect(() => {
     setLoading(true);
     loadData();
+    loadDailyReport();
   }, []);
 
   useEffect(() => {
@@ -90,8 +111,15 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (summary) loadData();
+    if (summary) {
+      loadData();
+      loadDailyReport();
+    }
   }, [summary]);
+
+  useEffect(() => {
+    loadDailyReport(reportStartDate, reportEndDate);
+  }, [reportStartDate, reportEndDate]);
 
   useEffect(() => {
     if (!attendantError) return;
@@ -187,6 +215,14 @@ export function DashboardPage() {
     } finally {
       setFinishingId(null);
     }
+  };
+
+  const exportDailyReport = () => {
+    window.open(
+      `${getApiBaseUrl()}/api/reports/daily.csv?startDate=${reportStartDate}&endDate=${reportEndDate}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   return (
@@ -473,6 +509,111 @@ export function DashboardPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </Section>
+        </div>
+        <div className="mt-6">
+          <Section
+            title="Relatórios gerenciais"
+            description="Visão consolidada para acompanhamento de desempenho e exportação para análise."
+            right={
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                  Início
+                  <input
+                    type="date"
+                    value={reportStartDate}
+                    onChange={(event) => setReportStartDate(event.target.value)}
+                    className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-700"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                  Fim
+                  <input
+                    type="date"
+                    value={reportEndDate}
+                    onChange={(event) => setReportEndDate(event.target.value)}
+                    className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-700"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={exportDailyReport}
+                  className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 sm:self-end"
+                >
+                  Exportar CSV
+                </button>
+              </div>
+            }
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <StatCard label="Atendimentos" value={dailyReport?.totalServiceRequests ?? "-"} />
+              <StatCard label="Entraram em espera" value={dailyReport?.waitedServiceRequests ?? "-"} />
+              <StatCard label="Em atendimento" value={dailyReport?.inProgressServiceRequests ?? "-"} />
+              <StatCard label="Concluídos" value={dailyReport?.completedServiceRequests ?? "-"} />
+              <StatCard label="Tempo médio" value={dailyReport ? formatSeconds(dailyReport.averageServiceSeconds) : "-"} />
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="w-full min-w-[620px] text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="px-3 py-2">Categoria</th>
+                      <th className="px-3 py-2 text-center">Atendimentos</th>
+                      <th className="px-3 py-2 text-center">Em espera</th>
+                      <th className="px-3 py-2 text-center">Concluídos</th>
+                      <th className="px-3 py-2 text-center">Tempo médio</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white">
+                    {dailyReport?.categories.map((item) => (
+                      <tr key={item.category} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-medium text-slate-900">{serviceCategoryLabels[item.category]}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{item.totalServiceRequests}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{item.waitedServiceRequests}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{item.completedServiceRequests}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.averageServiceSeconds)}</td>
+                      </tr>
+                    ))}
+                    {!dailyReport || reportLoading ? (
+                      <tr>
+                        <td className="px-3 py-6 text-slate-500" colSpan={5}>Carregando relatório...</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="w-full min-w-[620px] text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="px-3 py-2">Agente</th>
+                      <th className="px-3 py-2 text-center">Atendimentos</th>
+                      <th className="px-3 py-2 text-center">Tempo médio</th>
+                      <th className="px-3 py-2 text-center">Pausas</th>
+                      <th className="px-3 py-2 text-center">Tempo em pausa</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white">
+                    {dailyReport?.attendants.map((item) => (
+                      <tr key={item.attendantId} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-medium text-slate-900">{item.attendantName}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{item.serviceRequests}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.averageServiceSeconds)}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{item.pauseCount}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.totalPauseSeconds)}</td>
+                      </tr>
+                    ))}
+                    {!dailyReport || reportLoading ? (
+                      <tr>
+                        <td className="px-3 py-6 text-slate-500" colSpan={5}>Carregando relatório...</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </Section>
         </div>

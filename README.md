@@ -23,11 +23,22 @@ Aplicação full stack desenvolvida para o desafio técnico da Ubots. O sistema 
 - Validação de nomes para aceitar apenas letras e espaços.
 - Layout responsivo para desktop e smartphone.
 
+## Relatorios e Analytics
+
+Para aproximar a solucao de uma visao de inteligencia operacional, o painel tambem possui um modulo de relatorios gerenciais. Ele permite escolher um periodo, consultar indicadores consolidados, analisar desempenho por categoria e por agente, e exportar um CSV para planilhas ou ferramentas de BI.
+
+Endpoints do modulo:
+
+```http
+GET /api/reports/daily?startDate=2026-05-20&endDate=2026-05-28
+GET /api/reports/daily.csv?startDate=2026-05-20&endDate=2026-05-28
+```
+
 ## Stack
 
 ### Back-end
 
-- Java 25
+- Java 21
 - Spring Boot 3.3.5
 - Spring Web
 - Spring Data JPA

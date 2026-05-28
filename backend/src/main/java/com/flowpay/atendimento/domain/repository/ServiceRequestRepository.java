@@ -26,6 +26,8 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
 
     long countByQueuedAtBetween(Instant start, Instant end);
 
+    List<ServiceRequest> findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(Instant start, Instant end);
+
     @Query(value = """
         select coalesce(avg(extract(epoch from (sr.finished_at - sr.started_at))), 0)
         from service_requests sr
