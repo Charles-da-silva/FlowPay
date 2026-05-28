@@ -139,7 +139,8 @@ public class ReportService {
                             categoryRequests.stream().filter(request -> request.getQueuedAt() != null).count(),
                             countByStatus(categoryRequests, ServiceRequestStatus.IN_PROGRESS),
                             countByStatus(categoryRequests, ServiceRequestStatus.COMPLETED),
-                            averageCompletedSeconds(categoryRequests)
+                            averageCompletedSeconds(categoryRequests),
+                            averageWaitSeconds(categoryRequests)
                     );
                 })
                 .toList();
@@ -189,9 +190,20 @@ public class ReportService {
                 .orElse(0.0);
     }
 
+    private double averageWaitSeconds(List<ServiceRequest> requests) {
+        return requests.stream()
+                .filter(request -> request.getQueuedAt() != null && request.getStartedAt() != null)
+                .mapToLong(request -> Duration.between(request.getQueuedAt(), request.getStartedAt()).toSeconds())
+                .average()
+                .orElse(0.0);
+    }
+
     private void validatePeriod(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
             throw new IllegalStateException("Data inicial nao pode ser maior que a data final.");
+        }
+        if (endDate.isAfter(LocalDate.now())) {
+            throw new IllegalStateException("A data final nao pode ser uma data futura.");
         }
     }
 

@@ -54,6 +54,11 @@ function getDaysDifference(startDate: string, endDate: string): number {
   return Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
 }
 
+function formatDateDisplay(dateString: string): string {
+  const [year, month, day] = dateString.split('-');
+  return `${day}/${month}/${year}`;
+}
+
 function getCurrentMonth() {
   const today = new Date();
   const year = today.getFullYear();
@@ -146,6 +151,10 @@ export function DashboardPage() {
   const [reportEndDate, setReportEndDate] = useState(todayInputValue());
   const [dailyReport, setDailyReport] = useState<DailyReportResponse | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [selectedPeriodButton, setSelectedPeriodButton] = useState<string>("today");
+  const dailyReportWithWorstDays = dailyReport as DailyReportResponse & {
+    worstDays?: { date: string; serviceLevel: number }[];
+  };
 
   const loadData = async () => {
     try {
@@ -569,7 +578,7 @@ export function DashboardPage() {
                     <th className="px-3 py-2 text-center">Atendimentos</th>
                     <th className="px-3 py-2 text-center">Tempo médio</th>
                     <th className="px-3 py-2 text-center">Pausas</th>
-                    <th className="px-3 py-2 text-center">Tempo médio por dia</th>
+                    <th className="px-3 py-2 text-center">Tempo total das pausas</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white">
@@ -598,10 +607,31 @@ export function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      const today = todayInputValue();
+                      setReportStartDate(today);
+                      setReportEndDate(today);
+                      setSelectedPeriodButton("today");
+                    }}
+                    className={`rounded border px-3 py-1 text-xs font-medium ${
+                      selectedPeriodButton === "today"
+                        ? "border-blue-600 bg-blue-100 text-blue-800"
+                        : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    Hoje
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setReportStartDate(getCurrentMonth());
                       setReportEndDate(getMonthEnd());
+                      setSelectedPeriodButton("month");
                     }}
-                    className="rounded border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                    className={`rounded border px-3 py-1 text-xs font-medium ${
+                      selectedPeriodButton === "month"
+                        ? "border-blue-600 bg-blue-100 text-blue-800"
+                        : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    }`}
                   >
                     Mês atual
                   </button>
@@ -616,13 +646,16 @@ export function DashboardPage() {
                           if (dates) {
                             setReportStartDate(dates.start);
                             setReportEndDate(dates.end);
+                            setSelectedPeriodButton(quarter.name);
                           }
                         }}
                         disabled={isDisabled}
                         className={`rounded border px-3 py-1 text-xs font-medium ${
-                          isDisabled
-                            ? "border-slate-200 bg-slate-100 text-slate-400"
-                            : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                          selectedPeriodButton === quarter.name
+                            ? "border-blue-600 bg-blue-100 text-blue-800"
+                            : isDisabled
+                              ? "border-slate-200 bg-slate-100 text-slate-400"
+                              : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
                         }`}
                       >
                         {quarter.name}
@@ -632,27 +665,34 @@ export function DashboardPage() {
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                    Início
+                    Início: {formatDateDisplay(reportStartDate)}
                     <input
                       type="date"
                       value={reportStartDate}
-                      max={reportEndDate}
+                      max={todayInputValue()}
                       onChange={(event) => {
                         const newStart = event.target.value;
-                        setReportStartDate(newStart);
+                        if (newStart <= reportEndDate) {
+                          setReportStartDate(newStart);
+                          setSelectedPeriodButton("custom");
+                        }
                       }}
                       className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-700"
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                    Fim
+                    Fim: {formatDateDisplay(reportEndDate)}
                     <input
                       type="date"
                       value={reportEndDate}
                       min={reportStartDate}
+                      max={todayInputValue()}
                       onChange={(event) => {
                         const newEnd = event.target.value;
-                        setReportEndDate(newEnd);
+                        if (newEnd >= reportStartDate) {
+                          setReportEndDate(newEnd);
+                          setSelectedPeriodButton("custom");
+                        }
                       }}
                       className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-700"
                     />
@@ -675,12 +715,16 @@ export function DashboardPage() {
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 sm:p-4">
                 <p className="text-xs font-semibold text-slate-600">Dias com piores Service Level</p>
                 <div className="mt-2 space-y-1">
-                  {dailyReport?.worstDays.map((day) => (
-                    <div key={day.date} className="text-sm text-slate-900">
-                      <span className="font-mono text-xs text-slate-500">{day.date}</span>
-                      <span className="ml-2 font-semibold">{formatServiceLevel(day.serviceLevel)}</span>
-                    </div>
-                  )) ?? <span className="text-sm text-slate-500">-</span>}
+                  {(dailyReportWithWorstDays?.worstDays?.length ?? 0) > 0 ? (
+                    dailyReportWithWorstDays?.worstDays?.map((day) => (
+                      <div key={day.date} className="text-sm text-slate-900">
+                        <span className="font-mono text-xs text-slate-500">{day.date}</span>
+                        <span className="ml-2 font-semibold">{formatServiceLevel(day.serviceLevel)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-sm text-slate-500">-</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -690,10 +734,11 @@ export function DashboardPage() {
                 <table className="w-full min-w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
-                      <th className="px-3 py-2 w-32">Categoria</th>
+                      <th className="px-3 py-2 w-52">Categoria</th>
                       <th className="px-3 py-2 text-center">Atendimentos</th>
                       <th className="px-3 py-2 text-center">Tempo médio</th>
-                      <th className="px-3 py-2 text-center">Em espera Tempo médio</th>
+                      <th className="px-3 py-2 text-center">Entraram em espera</th>
+                      <th className="px-3 py-2 text-center">Tempo médio em espera</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white">
@@ -703,6 +748,7 @@ export function DashboardPage() {
                         <td className="px-3 py-2 text-center text-slate-600">{item.totalServiceRequests}</td>
                         <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.averageServiceSeconds)}</td>
                         <td className="px-3 py-2 text-center text-slate-600">{item.waitedServiceRequests}</td>
+                        <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.averageWaitSeconds)}</td>
                       </tr>
                     ))}
                     {!dailyReport || reportLoading ? (

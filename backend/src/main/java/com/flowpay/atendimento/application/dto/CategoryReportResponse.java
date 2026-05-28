@@ -8,6 +8,7 @@ public record CategoryReportResponse(
         long waitedServiceRequests,
         long inProgressServiceRequests,
         long completedServiceRequests,
-        double averageServiceSeconds
+        double averageServiceSeconds,
+        double averageWaitSeconds
 ) {
 }
