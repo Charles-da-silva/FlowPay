@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../services/api";
 import type { ServiceCategory, ServiceRequestResponse } from "../../types/api";
 import { serviceCategoryLabels } from "../../utils/labels";
 
 interface CreateServiceRequestFormProps {
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
 const namePattern = /^[\p{L} ]+$/u;
@@ -18,7 +19,7 @@ function isValidPersonName(value: string) {
   return normalized.length >= 2 && namePattern.test(normalized);
 }
 
-export function CreateServiceRequestForm({ onSuccess }: CreateServiceRequestFormProps) {
+export function CreateServiceRequestForm({ onSuccess, onCancel }: CreateServiceRequestFormProps) {
   const [customerName, setCustomerName] = useState("");
   const [category, setCategory] = useState<ServiceCategory>("CARD_ISSUES");
   const [loading, setLoading] = useState(false);
@@ -26,6 +27,12 @@ export function CreateServiceRequestForm({ onSuccess }: CreateServiceRequestForm
   const [success, setSuccess] = useState<ServiceRequestResponse | null>(null);
 
   const categories: ServiceCategory[] = ["CARD_ISSUES", "LOAN_CONTRACTING", "OTHER_SUBJECTS"];
+
+  useEffect(() => {
+    if (!error) return;
+    const timeoutId = window.setTimeout(() => setError(null), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,13 +102,23 @@ export function CreateServiceRequestForm({ onSuccess }: CreateServiceRequestForm
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:bg-slate-400"
-      >
-        {loading ? "Criando..." : "Criar atendimento"}
-      </button>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <button
+          type="submit"
+          disabled={loading}
+          className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:bg-slate-400"
+        >
+          {loading ? "Criando..." : "Criar atendimento"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={loading}
+          className="rounded bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 disabled:bg-slate-100"
+        >
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

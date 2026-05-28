@@ -9,6 +9,7 @@ export type ServiceRequestStatus = "WAITING" | "IN_PROGRESS" | "COMPLETED";
 export interface AttendantResponse {
   id: number;
   name: string;
+  badge: string;
   status: AttendantStatus;
   activeServiceRequests: number;
   availableSince: string | null;
@@ -33,6 +34,7 @@ export interface ServiceRequestResponse {
 export interface AttendantDailySummaryResponse {
   attendantId: number;
   attendantName: string;
+  attendantBadge: string;
   serviceRequests: number;
   averageServiceSeconds: number;
   pauseCount: number;

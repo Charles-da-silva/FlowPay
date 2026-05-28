@@ -8,7 +8,7 @@ import type {
 export const api = {
   attendants: {
     list: () => httpGet<AttendantResponse[]>("/api/attendants"),
-    create: (body: { name: string; categories: string[] }) =>
+    create: (body: { name: string; badge: string; categories: string[] }) =>
       httpPost<AttendantResponse, typeof body>("/api/attendants", body),
     update: (id: number, body: { name: string; categories: string[] }) =>
       httpPut<AttendantResponse, typeof body>(`/api/attendants/${id}`, body),

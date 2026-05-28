@@ -190,9 +190,9 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-4">
+    <div className="min-h-screen bg-slate-200">
+      <header className="border-b border-slate-300 bg-white shadow-md">
+        <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-xl font-semibold text-slate-950">FlowPay - Painel de monitoramento de fila</h1>
@@ -216,8 +216,8 @@ export function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6">
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <main className="mx-auto max-w-7xl px-3 py-5 sm:px-4 sm:py-6">
+        <section className="rounded-xl border border-slate-300 bg-white p-3 shadow-md ring-1 ring-white sm:p-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard label="Service Level" value={summary ? formatServiceLevel(summary.todayServiceLevel) : "-"} />
             <StatCard label="Atendimentos hoje" value={summary?.todayServiceRequests ?? "-"} />
@@ -242,6 +242,7 @@ export function DashboardPage() {
             <div className="mt-4">
               {formPanel === "service" ? (
                 <CreateServiceRequestForm
+                  onCancel={() => setFormPanel(null)}
                   onSuccess={() => {
                     setFormPanel(null);
                     loadData();
@@ -249,6 +250,7 @@ export function DashboardPage() {
                 />
               ) : (
                 <CreateAttendantForm
+                  onCancel={() => setFormPanel(null)}
                   onSuccess={() => {
                     setFormPanel(null);
                     loadData();
@@ -262,22 +264,55 @@ export function DashboardPage() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <StatCard label="Agentes logados" value={summary?.totalAttendants ?? "-"} />
           <StatCard label="Agentes disponíveis" value={summary?.availableAttendants ?? "-"} />
-          <StatCard label="Agentes ocupados" value={summary?.busyAttendants ?? "-"} />
+          <StatCard label="Agentes em atendimento" value={summary?.busyAttendants ?? "-"} />
           <StatCard label="Clientes na fila" value={summary?.waitingServiceRequests ?? "-"} />
           <StatCard label="Clientes em atendimento" value={summary?.inProgressServiceRequests ?? "-"} />
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="mt-6 space-y-6">
+          <Section
+            title="Fila de espera"
+            description="Clientes aguardando disponibilidade de agentes elegíveis."
+            right={<span className="text-sm text-slate-500">{loading ? "carregando..." : `${queue.length} clientes`}</span>}
+          >
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full min-w-[680px] text-left text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2">Cliente</th>
+                    <th className="px-3 py-2">Categoria</th>
+                    <th className="px-3 py-2 text-center">Tempo em espera</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {queue.map((request) => (
+                    <tr key={request.id} className="border-t border-slate-100">
+                      <td className="px-3 py-2 font-medium text-slate-900">{request.customerName}</td>
+                      <td className="px-3 py-2 text-slate-600">{serviceCategoryLabels[request.category]}</td>
+                      <td className="px-3 py-2 text-center text-slate-600">{formatDuration(request.queuedAt ?? request.createdAt, null, now)}</td>
+                    </tr>
+                  ))}
+                  {queue.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-slate-500" colSpan={3}>Nenhum cliente em fila.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </Section>
+
           <Section
             title="Em atendimento"
             description="Clientes já atribuídos a agentes."
             right={<span className="text-sm text-slate-500">{loading ? "carregando..." : `${activeRequests.length} ativos`}</span>}
           >
             <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-full min-w-[560px] text-left text-sm">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     <th className="px-3 py-2">Cliente</th>
+                    <th className="px-3 py-2">Categoria</th>
                     <th className="px-3 py-2">Agente</th>
                     <th className="px-3 py-2 text-center">Tempo</th>
                     <th className="px-3 py-2">Ação</th>
@@ -287,6 +322,7 @@ export function DashboardPage() {
                   {activeRequests.map((request) => (
                     <tr key={request.id} className="border-t border-slate-100">
                       <td className="px-3 py-2 font-medium text-slate-900">{request.customerName}</td>
+                      <td className="px-3 py-2 text-slate-600">{serviceCategoryLabels[request.category]}</td>
                       <td className="px-3 py-2 text-slate-600">{request.attendantName ?? "-"}</td>
                       <td className="px-3 py-2 text-center text-slate-600">{formatDuration(request.startedAt, request.finishedAt, now)}</td>
                       <td className="px-3 py-2">
@@ -309,39 +345,7 @@ export function DashboardPage() {
                   ))}
                   {activeRequests.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-6 text-slate-500" colSpan={4}>Nenhum atendimento em andamento.</td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </Section>
-
-          <Section
-            title="Fila de espera"
-            description="Clientes aguardando disponibilidade de agentes elegíveis."
-            right={<span className="text-sm text-slate-500">{loading ? "carregando..." : `${queue.length} clientes`}</span>}
-          >
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-full min-w-[500px] text-left text-sm">
-                <thead className="bg-slate-50 text-slate-600">
-                  <tr>
-                    <th className="px-3 py-2">Cliente</th>
-                    <th className="px-3 py-2">Categoria</th>
-                    <th className="px-3 py-2 text-center">Espera</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white">
-                  {queue.map((request) => (
-                    <tr key={request.id} className="border-t border-slate-100">
-                      <td className="px-3 py-2 font-medium text-slate-900">{request.customerName}</td>
-                      <td className="px-3 py-2 text-slate-600">{serviceCategoryLabels[request.category]}</td>
-                      <td className="px-3 py-2 text-center text-slate-600">{formatDuration(request.queuedAt ?? request.createdAt, null, now)}</td>
-                    </tr>
-                  ))}
-                  {queue.length === 0 ? (
-                    <tr>
-                      <td className="px-3 py-6 text-slate-500" colSpan={3}>Nenhum cliente em fila.</td>
+                      <td className="px-3 py-6 text-slate-500" colSpan={5}>Nenhum atendimento em andamento.</td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -353,7 +357,7 @@ export function DashboardPage() {
         <div className="mt-6">
           <Section
             title="Agentes logados"
-            description="Carga, tempo disponível ou em pausa, categorias e ações operacionais."
+            description="Informações dos agentes logados, seus status e ações possíveis"
             right={<span className="text-sm text-slate-500">{loading ? "carregando..." : `${attendants.length} agentes`}</span>}
           >
             {attendantError ? <div className="mb-3 rounded bg-rose-50 px-3 py-2 text-sm text-rose-700">{attendantError}</div> : null}
@@ -361,11 +365,12 @@ export function DashboardPage() {
               <table className="w-full min-w-[900px] text-left text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
+                    <th className="px-3 py-2">Badge</th>
                     <th className="px-3 py-2">Nome</th>
                     <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2 text-center">Atendimentos</th>
-                    <th className="px-3 py-2 text-center">Tempo</th>
-                    <th className="px-3 py-2">Categorias</th>
+                    <th className="px-3 py-2 text-center">Tempo (disponível ou pausa)</th>
+                    <th className="px-3 py-2">Categorias de atendimento</th>
                     <th className="px-3 py-2">Ações</th>
                   </tr>
                 </thead>
@@ -377,6 +382,7 @@ export function DashboardPage() {
 
                     return (
                       <tr key={attendant.id} className="border-t border-slate-100 align-top">
+                        <td className="px-3 py-2 font-mono text-xs font-semibold text-slate-700">{attendant.badge}</td>
                         <td className="px-3 py-2 font-medium text-slate-900">
                           {isEditing ? <input value={editName} onChange={(event) => setEditName(event.target.value)} className="w-36 rounded border border-slate-300 px-2 py-1 text-sm" /> : attendant.name}
                         </td>
@@ -431,7 +437,7 @@ export function DashboardPage() {
                   })}
                   {attendants.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-6 text-slate-500" colSpan={6}>Nenhum agente cadastrado ainda.</td>
+                      <td className="px-3 py-6 text-slate-500" colSpan={7}>Nenhum agente cadastrado ainda.</td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -446,6 +452,7 @@ export function DashboardPage() {
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
+                    <th className="px-3 py-2">Badge</th>
                     <th className="px-3 py-2">Agente</th>
                     <th className="px-3 py-2 text-center">Atendimentos</th>
                     <th className="px-3 py-2 text-center">Tempo médio</th>
@@ -456,6 +463,7 @@ export function DashboardPage() {
                 <tbody className="bg-white">
                   {summary?.todayByAttendant.map((item) => (
                     <tr key={item.attendantId} className="border-t border-slate-100">
+                      <td className="px-3 py-2 font-mono text-xs font-semibold text-slate-700">{item.attendantBadge}</td>
                       <td className="px-3 py-2 font-medium text-slate-900">{item.attendantName}</td>
                       <td className="px-3 py-2 text-center text-slate-600">{item.serviceRequests}</td>
                       <td className="px-3 py-2 text-center text-slate-600">{formatSeconds(item.averageServiceSeconds)}</td>

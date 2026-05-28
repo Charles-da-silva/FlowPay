@@ -5,7 +5,9 @@ import com.flowpay.atendimento.application.dto.CreateAttendantRequest;
 import com.flowpay.atendimento.application.dto.UpdateAttendantRequest;
 import com.flowpay.atendimento.domain.entity.Attendant;
 import com.flowpay.atendimento.domain.entity.AttendantPause;
+import com.flowpay.atendimento.domain.entity.ServiceRequest;
 import com.flowpay.atendimento.domain.enums.AttendantStatus;
+import com.flowpay.atendimento.domain.enums.ServiceCategory;
 import com.flowpay.atendimento.domain.enums.ServiceRequestStatus;
 import com.flowpay.atendimento.domain.repository.AttendantPauseRepository;
 import com.flowpay.atendimento.domain.repository.AttendantRepository;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.time.Instant;
+import java.util.Locale;
 
 @Service
 public class AttendantService {
@@ -39,8 +42,28 @@ public class AttendantService {
 
     @Transactional
     public AttendantResponse create(CreateAttendantRequest request) {
+        String badge = normalizeBadge(request.badge());
+        Attendant existing = attendantRepository.findByBadgeIgnoreCase(badge).orElse(null);
+        if (existing != null) {
+            if (existing.getStatus() != AttendantStatus.INACTIVE) {
+                throw new IllegalStateException("Badge ja esta em uso por agente logado.");
+            }
+
+            existing.setName(request.name());
+            existing.setBadge(badge);
+            existing.setStatus(AttendantStatus.AVAILABLE);
+            existing.setAvailableSince(Instant.now());
+            existing.setPausedSince(null);
+            existing.setCategories(request.categories());
+            Attendant saved = attendantRepository.save(existing);
+            redistributeWaitingRequestsFor(saved);
+            dashboardSseService.notifyDashboardChanged();
+            return toResponse(saved);
+        }
+
         Attendant attendant = Attendant.builder()
                 .name(request.name())
+                .badge(badge)
                 .status(AttendantStatus.AVAILABLE)
                 .availableSince(Instant.now())
                 .maxSimultaneousCustomers(3)
@@ -48,13 +71,14 @@ public class AttendantService {
                 .build();
 
         Attendant saved = attendantRepository.save(attendant);
+        redistributeWaitingRequestsFor(saved);
         dashboardSseService.notifyDashboardChanged();
         return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
     public List<AttendantResponse> list() {
-        return attendantRepository.findAll()
+        return attendantRepository.findLogged()
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -73,6 +97,7 @@ public class AttendantService {
                 ServiceRequestStatus.IN_PROGRESS
         );
         refreshStatus(attendant, openRequestsCount);
+        redistributeWaitingRequestsFor(attendant);
         dashboardSseService.notifyDashboardChanged();
         return toResponse(attendant);
     }
@@ -90,8 +115,10 @@ public class AttendantService {
             throw new IllegalStateException("Nao e possivel excluir agente com atendimentos em andamento.");
         }
 
-        serviceRequestRepository.clearInactiveAssignmentsForAttendant(attendant.getId());
-        attendantRepository.delete(attendant);
+        attendant.setStatus(AttendantStatus.INACTIVE);
+        attendant.setAvailableSince(null);
+        attendant.setPausedSince(null);
+        attendantRepository.save(attendant);
         dashboardSseService.notifyDashboardChanged();
     }
 
@@ -118,6 +145,7 @@ public class AttendantService {
         attendant.setAvailableSince(null);
         attendant.setPausedSince(now);
         Attendant saved = attendantRepository.save(attendant);
+        redistributeWaitingRequestsFor(saved);
         dashboardSseService.notifyDashboardChanged();
         return toResponse(saved);
     }
@@ -142,6 +170,7 @@ public class AttendantService {
         attendant.setAvailableSince(now);
         attendant.setPausedSince(null);
         Attendant saved = attendantRepository.save(attendant);
+        redistributeWaitingRequestsFor(saved);
         dashboardSseService.notifyDashboardChanged();
         return toResponse(saved);
     }
@@ -168,6 +197,7 @@ public class AttendantService {
         return new AttendantResponse(
                 attendant.getId(),
                 attendant.getName(),
+                attendant.getBadge(),
                 attendant.getStatus(),
                 serviceRequestRepository.countByAttendantIdAndStatus(
                         attendant.getId(),
@@ -178,5 +208,50 @@ public class AttendantService {
                 attendant.getMaxSimultaneousCustomers(),
                 attendant.getCategories()
         );
+    }
+
+    private void redistributeWaitingRequestsFor(Attendant attendant) {
+        if (attendant.getStatus() == AttendantStatus.PAUSED || attendant.getStatus() == AttendantStatus.INACTIVE) {
+            return;
+        }
+
+        long openRequestsCount = serviceRequestRepository.countByAttendantIdAndStatus(
+                attendant.getId(),
+                ServiceRequestStatus.IN_PROGRESS
+        );
+
+        boolean assigned;
+        do {
+            assigned = false;
+            if (openRequestsCount >= attendant.getMaxSimultaneousCustomers()) {
+                break;
+            }
+
+            for (ServiceCategory category : attendant.getCategories()) {
+                if (openRequestsCount >= attendant.getMaxSimultaneousCustomers()) {
+                    break;
+                }
+
+                ServiceRequest next = serviceRequestRepository
+                        .findFirstByStatusAndCategoryOrderByCreatedAtAsc(ServiceRequestStatus.WAITING, category)
+                        .orElse(null);
+                if (next == null) {
+                    continue;
+                }
+
+                next.setAttendant(attendant);
+                next.setStatus(ServiceRequestStatus.IN_PROGRESS);
+                next.setStartedAt(Instant.now());
+                serviceRequestRepository.save(next);
+                openRequestsCount++;
+                assigned = true;
+            }
+        } while (assigned);
+
+        refreshStatus(attendant, openRequestsCount);
+    }
+
+    private String normalizeBadge(String badge) {
+        return badge.trim().toUpperCase(Locale.ROOT);
     }
 }

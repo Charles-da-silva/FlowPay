@@ -9,6 +9,7 @@ import java.util.Set;
 public record AttendantResponse(
         Long id,
         String name,
+        String badge,
         AttendantStatus status,
         Long activeServiceRequests,
         Instant availableSince,

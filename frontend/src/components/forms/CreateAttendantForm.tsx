@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../services/api";
 import type { ServiceCategory } from "../../types/api";
 import { serviceCategoryLabels } from "../../utils/labels";
 
 interface CreateAttendantFormProps {
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
 const namePattern = /^[\p{L} ]+$/u;
@@ -18,14 +19,22 @@ function isValidPersonName(value: string) {
   return normalized.length >= 2 && namePattern.test(normalized);
 }
 
-export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
+export function CreateAttendantForm({ onSuccess, onCancel }: CreateAttendantFormProps) {
   const [name, setName] = useState("");
+  const [badge, setBadge] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const categories: ServiceCategory[] = ["CARD_ISSUES", "LOAN_CONTRACTING", "OTHER_SUBJECTS"];
+  const badgePattern = /^[A-Za-z0-9-]{2,20}$/;
+
+  useEffect(() => {
+    if (!error) return;
+    const timeoutId = window.setTimeout(() => setError(null), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [error]);
 
   const toggleCategory = (category: ServiceCategory) => {
     setSelectedCategories((prev) =>
@@ -43,6 +52,11 @@ export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
       return;
     }
 
+    if (!badgePattern.test(badge.trim())) {
+      setError("Informe um Badge com 2 a 20 letras, números ou hífen.");
+      return;
+    }
+
     if (selectedCategories.length === 0) {
       setError("Selecione pelo menos uma categoria.");
       return;
@@ -50,9 +64,14 @@ export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
 
     setLoading(true);
     try {
-      await api.attendants.create({ name: normalizeName(name), categories: selectedCategories });
+      await api.attendants.create({
+        name: normalizeName(name),
+        badge: badge.trim().toUpperCase(),
+        categories: selectedCategories,
+      });
       setSuccess(true);
       setName("");
+      setBadge("");
       setSelectedCategories([]);
       setTimeout(() => setSuccess(false), 3000);
       onSuccess?.();
@@ -76,6 +95,18 @@ export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
           placeholder="Ex: João Silva"
           disabled={loading}
           className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none disabled:bg-slate-50"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700">Badge</label>
+        <input
+          type="text"
+          value={badge}
+          onChange={(e) => setBadge(e.target.value)}
+          placeholder="Ex: AG001"
+          disabled={loading}
+          className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase placeholder:normal-case placeholder-slate-400 focus:border-blue-500 focus:outline-none disabled:bg-slate-50"
         />
       </div>
 
@@ -104,13 +135,23 @@ export function CreateAttendantForm({ onSuccess }: CreateAttendantFormProps) {
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-slate-400"
-      >
-        {loading ? "Criando..." : "Criar agente"}
-      </button>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <button
+          type="submit"
+          disabled={loading}
+          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-slate-400"
+        >
+          {loading ? "Criando..." : "Criar agente"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={loading}
+          className="rounded bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 disabled:bg-slate-100"
+        >
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }

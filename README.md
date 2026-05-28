@@ -4,7 +4,8 @@ Aplicação full stack desenvolvida para o desafio técnico da FlowPay. O sistem
 
 ## Funcionalidades
 
-- Cadastro, edição, exclusão, pausa e retorno de agentes.
+- Cadastro, edição, exclusão lógica, pausa e retorno de agentes.
+- Identificação de agentes por Badge único.
 - Associação de agentes a uma ou mais categorias:
   - Problemas com cartão
   - Contratação de empréstimo
@@ -146,7 +147,7 @@ VITE_API_BASE_URL=http://localhost:8080
 4. Se houver agentes sem atendimento em andamento, o atendimento vai para quem está disponível há mais tempo.
 5. Se todos os agentes elegíveis já estiverem atendendo, mas ainda houver capacidade, o atendimento vai para quem recebeu menos atendimentos no dia.
 6. Se nenhum agente elegível tiver capacidade, o atendimento entra na fila e o Service Level do dia é impactado.
-7. Quando um atendimento é finalizado, o sistema tenta redistribuir automaticamente o próximo item da fila da mesma categoria.
+7. Quando um atendimento é finalizado, um agente volta da pausa, é criado ou tem categorias editadas, o sistema tenta redistribuir automaticamente a fila compatível.
 
 ## Endpoints principais
 
@@ -186,6 +187,7 @@ O endpoint `/api/dashboard/stream` usa SSE para enviar atualizações em tempo r
 ```json
 {
   "name": "João Silva",
+  "badge": "AG001",
   "categories": ["CARD_ISSUES", "OTHER_SUBJECTS"]
 }
 ```
@@ -220,5 +222,7 @@ npm run build
 - O Flyway versiona a estrutura inicial do banco, dados de exemplo e evoluções de métricas/pausas.
 - O status do agente é recalculado com base na quantidade de atendimentos em andamento.
 - A exclusão de agente é bloqueada quando há atendimentos em andamento para evitar inconsistência operacional.
+- A exclusão de agente é lógica: o agente sai dos logados, mas seu histórico do dia permanece.
+- Caso um agente seja cadastrado novamente com o mesmo Badge, o registro anterior é reutilizado.
 - As pausas são registradas em tabela própria para permitir histórico diário.
 - O painel combina chamadas REST com SSE para manter a tela atualizada em tempo real.

@@ -43,6 +43,9 @@ public class Attendant {
     @Column(nullable = false, length = 120)
     private String name;
 
+    @Column(nullable = false, unique = true, length = 20)
+    private String badge;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private AttendantStatus status;

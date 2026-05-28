@@ -49,7 +49,7 @@ public class DashboardService {
 
         // Resumo simples para monitorar operacao e fila em tempo real.
         return new DashboardSummaryResponse(
-                attendantRepository.count(),
+                attendantRepository.countLogged(),
                 attendantRepository.countByStatus(AttendantStatus.AVAILABLE),
                 attendantRepository.countByStatus(AttendantStatus.BUSY),
                 attendantRepository.countByStatus(AttendantStatus.PAUSED),
@@ -69,6 +69,7 @@ public class DashboardService {
         return new AttendantDailySummaryResponse(
                 attendant.getId(),
                 attendant.getName(),
+                attendant.getBadge(),
                 serviceRequestRepository.countByAttendantIdAndCreatedAtBetween(attendant.getId(), startOfDay, endOfDay),
                 serviceRequestRepository.averageCompletedServiceSecondsByAttendantAndCreatedAtBetween(
                         attendant.getId(),

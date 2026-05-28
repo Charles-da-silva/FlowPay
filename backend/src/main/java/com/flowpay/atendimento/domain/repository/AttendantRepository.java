@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface AttendantRepository extends JpaRepository<Attendant, Long> {
 
@@ -37,4 +38,19 @@ public interface AttendantRepository extends JpaRepository<Attendant, Long> {
     List<Attendant> findByStatus(AttendantStatus status);
 
     long countByStatus(AttendantStatus status);
+
+    @Query("""
+        select a from Attendant a
+        where a.status <> com.flowpay.atendimento.domain.enums.AttendantStatus.INACTIVE
+        order by a.id asc
+        """)
+    List<Attendant> findLogged();
+
+    @Query("""
+        select count(a) from Attendant a
+        where a.status <> com.flowpay.atendimento.domain.enums.AttendantStatus.INACTIVE
+        """)
+    long countLogged();
+
+    Optional<Attendant> findByBadgeIgnoreCase(String badge);
 }
