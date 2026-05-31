@@ -55,33 +55,12 @@ function formatDateInput(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function clampDateToToday(date: string) {
-  const today = todayInputValue();
-  return date > today ? today : date;
-}
-
-function normalizeReportRange(startDate: string, endDate: string) {
-  const today = todayInputValue();
-  const safeStart = clampDateToToday(startDate);
-  const safeEnd = clampDateToToday(endDate);
-
-  if (safeStart > safeEnd) {
-    return { start: today, end: today };
-  }
-
-  return { start: safeStart, end: safeEnd };
-}
-
 function getDaysDifference(startDate: string, endDate: string): number {
   const start = new Date(startDate).getTime();
   const end = new Date(endDate).getTime();
   return Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
 }
 
-function formatDateDisplay(dateString: string): string {
-  const [year, month, day] = dateString.split('-');
-  return `${day}/${month}/${year}`;
-}
 
 function getCurrentMonth() {
   const today = new Date();
@@ -143,15 +122,6 @@ function getQuarterDates(quarter: Quarter): { start: string; end: string } | nul
   return { start: startDate, end: endDate };
 }
 
-function isQuarterActive(quarter: Quarter): boolean {
-  const today = new Date();
-  const currentMonth = today.getMonth() + 1;
-
-  if (quarter.endMonth < quarter.startMonth) {
-    return currentMonth >= quarter.startMonth || currentMonth <= quarter.endMonth;
-  }
-  return currentMonth >= quarter.startMonth && currentMonth <= quarter.endMonth;
-}
 
 function hasQuarterPassed(quarter: Quarter): boolean {
   const today = new Date();
@@ -604,7 +574,7 @@ export function DashboardPage() {
         </div>
 
         <div className="mt-6">
-          <Section title="Histórico dos agentes" description="Produção e pausas acumuladas no dia.">
+          <Section title="Histórico dos agentes no dia atual" description="Produção e pausas acumuladas no dia.">
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-slate-50 text-slate-600">

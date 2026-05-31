@@ -64,6 +64,7 @@ export interface CategoryReportResponse {
   inProgressServiceRequests: number;
   completedServiceRequests: number;
   averageServiceSeconds: number;
+  averageWaitSeconds: number;
 }
 
 export interface DailyReportResponse {
