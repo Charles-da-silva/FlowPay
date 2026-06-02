@@ -96,9 +96,26 @@ public class ServiceRequestService {
         // Redistribuicao automatica: sempre que libera slot, tenta puxar da fila.
         redistributeQueue(serviceRequest.getCategory());
         notifyDashboardUpdate();
+
+        /* Pega a entidade serviceRequest (com seus novos dados de finalizada), passa pelo Mapper que 
+        a transforma em um DTO limpo e envia no retorno do método.*/
         return serviceRequestMapper.toResponse(serviceRequest);
     }
 
+
+    /* @Transactional(readOnly = true) – Diz ao Spring que este método apenas lê dados do banco, 
+    não faz alterações (nem Insert, nem Update, nem Delete). Isso faz com que o Hibernate desative 
+    a checagem de modificações (dirty checking), deixando a consulta muito mais leve e performática.
+    
+    >> serviceRequestRepository.findAll() – Busca todos os registros da tabela de chamados no banco e 
+    retorna uma List<ServiceRequest>.
+    >> .stream() – Abre um fluxo de dados (Stream API do Java). É como colocar a lista em uma esteira 
+    rolante para processar cada item um por um de forma funcional.
+    >> .map(serviceRequestMapper::toResponse) – O método map transforma os itens da esteira. Usando a 
+    sintaxe de Method Reference (::), ele passa cada entidade da esteira para dentro do método toResponse 
+    do Mapper, transformando a lista de entidades em uma lista de DTOs.
+    >> .toList() – Fecha a esteira rolante e agrupa todos os elementos transformados de volta em uma 
+    nova lista (List), que é retornada pelo método.*/
     @Transactional(readOnly = true)
     public List<ServiceRequestResponse> list() {
         return serviceRequestRepository.findAll()
@@ -107,6 +124,10 @@ public class ServiceRequestService {
                 .toList();
     }
 
+    /* findByStatusOrderByCreatedAtAsc(...) – Uma das mágicas do Spring Data JPA (chamada Derived Query). 
+    O Spring lê o nome desse método e cria automaticamente uma consulta SQL com a cláusula 
+    WHERE status = 'WAITING' ORDER BY created_at ASC. Isso traz apenas os chamados na fila, 
+    priorizando os mais antigos.*/
     @Transactional(readOnly = true)
     public List<ServiceRequestResponse> listQueue() {
         return serviceRequestRepository.findByStatusOrderByCreatedAtAsc(ServiceRequestStatus.WAITING)
@@ -116,27 +137,57 @@ public class ServiceRequestService {
     }
 
     private Optional<Attendant> findEligibleAttendant(ServiceCategory category) {
+
+        /* LocalDate.now().atStartOfDay(...) – Captura a data de hoje e define o horário para 00:00:00 
+        no fuso horário do sistema, convertendo para o tipo Instant (UTC). endOfDay faz o mesmo, mas 
+        soma 1 dia (00:00:00 de amanhã). Isso cria uma janela de tempo para sabermos o que aconteceu 
+        "no dia de hoje".*/
         Instant startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant endOfDay = LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
 
-        return attendantRepository.findEligible(category)
-                .stream()
-                .min(Comparator
+        /* findEligible(category) - busca apenas atendentes que podem atender a categoria
+        .stream() - Transforma a lista de atendentes em uma esteira para aplicar ordenação personalizada
+        .min(Comparator - Percorre a esteira e pega o "menor" atendente baseado nos critérios que vêm depois:
+        
+            Critério 1 – Verifica se o atendente tem zero chamados ativos no momento (activeRequestsCount == 0). 
+            Se tiver zero, recebe peso 0 (menor). Se tiver chamados, recebe peso 1. Como o método busca o .min(), 
+            quem tem peso 0 ganha prioridade máxima.
+
+            Critério 2 – Se houver empate no critério 1 (ex: dois atendentes estão com zero chamados), o 
+            thenComparing entra em ação. Ele olha o campo getAvailableSince (disponível desde). Datas mais 
+            antigas são consideradas "menores" em Java, logo, quem está esperando há mais tempo na fila de 
+            ociosidade ganha a vez. Se não aplicar, joga para o início dos tempos (Instant.EPOCH).
+
+            Critério 3 – Se o empate persistir, ele conta quantos chamados aquele atendente já criou/atendeu
+            entre o início e o fim do dia de hoje (countByAttendantIdAndCreatedAtBetween...). Quem tiver o 
+            menor número (menos chamados atendidos hoje) ganha a vaga. Isso garante uma distribuição justa 
+            de carga de trabalho durante o dia.
+
+            Critério 4 – Se ainda assim empatar, ele olha a quantidade bruta de chamados simultâneos ativos 
+            (IN_PROGRESS) que o atendente possui agora. O que tiver menos chamados ganha.
+
+            Critério 5 – O último desempate absoluto: se tudo for idêntico, compara pelo ID do atendente no 
+            banco de dados. O menor ID ganha. O resultado de toda essa busca (que pode ser um atendente ou 
+            um vazio se a lista inicial do banco veio vazia) é retornado como um Optional<Attendant>
+            */
+        return attendantRepository.findEligible(category) 
+                .stream() 
+                .min(Comparator  
                         .comparingLong((Attendant attendant) -> activeRequestsCount(attendant.getId()) == 0 ? 0 : 1)
                         .thenComparing(
                                 attendant -> activeRequestsCount(attendant.getId()) == 0 && attendant.getAvailableSince() != null
                                         ? attendant.getAvailableSince()
-                                        : Instant.EPOCH
+                                        : Instant.EPOCH // Se o atendente não estiver disponível, atribui a data mais antiga possível para que ele fique por último na ordenação
                         )
                         .thenComparingLong(attendant ->
-                                serviceRequestRepository.countByAttendantIdAndCreatedAtBetween(
+                                serviceRequestRepository.countByAttendantIdAndCreatedAtBetween( // Atendentes com menos atendimentos no dia têm prioridade
                                         attendant.getId(),
                                         startOfDay,
                                         endOfDay
                                 )
                         )
-                        .thenComparingLong(attendant -> activeRequestsCount(attendant.getId()))
-                        .thenComparing(Attendant::getId));
+                        .thenComparingLong(attendant -> activeRequestsCount(attendant.getId())) // Atendentes com menos atendimentos em progresso têm prioridade
+                        .thenComparing(Attendant::getId)); // Critério final para desempate: ID do atendente (garante ordem consistente)
     }
 
     private long activeRequestsCount(Long attendantId) {
@@ -162,19 +213,33 @@ public class ServiceRequestService {
     }
 
     private void redistributeQueue(ServiceCategory category) {
+        /* Este método é chamado sempre que um atendimento é finalizado ou um agente fica disponível, 
+        para tentar puxar o próximo atendimento da fila. */
+
+        /*Este Optional pode ou não retornar um atendente elegível. Se não houver nenhum atendente 
+        disponível para a categoria, o método simplesmente retorna sem fazer nada e a variável "eligible" 
+        fica vazia (empty).*/
         Optional<Attendant> eligible = findEligibleAttendant(category);
+
+        // Se não houver atendente elegível, não há como redistribuir a fila, então o método retorna sem fazer nada.
         if (eligible.isEmpty()) {
             return;
         }
 
+        /* Este Optional pode ou não retornar um atendimento na fila de espera para a categoria. 
+        Se não houver nenhum atendimento esperando, o método retorna sem fazer nada e a variável 
+        "nextInQueue" fica vazia (empty).*/
         Optional<ServiceRequest> nextInQueue = serviceRequestRepository.findFirstByStatusAndCategoryOrderByCreatedAtAsc(
                 ServiceRequestStatus.WAITING,
                 category
         );
+
         if (nextInQueue.isEmpty()) {
             return;
         }
 
+        /* Caso haja um atendente elegível e um atendimento na fila, o método prossegue para atribuir o 
+        atendimento ao atendente.*/
         ServiceRequest next = nextInQueue.get();
         Attendant attendant = eligible.get();
         assignToAttendant(next, attendant);

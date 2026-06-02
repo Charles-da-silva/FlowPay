@@ -1,6 +1,4 @@
 // Tipos do frontend (TypeScript) que espelham o backend.
-// Comentario: manter estes tipos bem definidos ajuda muito em entrevistas,
-// porque voce mostra que entende o contrato (API) entre front e back.
 
 export type AttendantStatus = "AVAILABLE" | "BUSY" | "PAUSED" | "INACTIVE";
 export type ServiceCategory = "CARD_ISSUES" | "LOAN_CONTRACTING" | "OTHER_SUBJECTS";

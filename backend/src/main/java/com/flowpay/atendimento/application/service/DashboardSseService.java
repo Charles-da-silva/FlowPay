@@ -43,7 +43,7 @@ public class DashboardSseService {
     }
 
     /**
-     * Chamado apos criar/finalizar atendimento ou redistribuir fila.
+     * Chamado apos criar/finalizar atendimento, criar agente ou redistribuir fila.
      */
     public void notifyDashboardChanged() {
         DashboardSummaryResponse summary = dashboardService.getSummary();

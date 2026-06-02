@@ -16,6 +16,9 @@ import java.time.Instant;
 
 public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, Long> {
 
+/*  Estes métodos abaixo utilizam o recurso Derived Query Methods (Métodos de Consulta Derivados) do 
+    Spring Data JPA. O framework lê o nome do método e gera a consulta SQL automaticamente para você. */
+    
     long countByAttendantIdAndStatus(Long attendantId, ServiceRequestStatus status);
 
     long countByAttendantId(Long attendantId);

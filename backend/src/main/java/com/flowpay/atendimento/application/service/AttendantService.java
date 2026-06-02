@@ -42,8 +42,13 @@ public class AttendantService {
 
     @Transactional
     public AttendantResponse create(CreateAttendantRequest request) {
-        String badge = normalizeBadge(request.badge());
+        // "normalizeBadge" - remove espaços em branco e padroniza as letras em maiúsculo.
+        String badge = normalizeBadge(request.badge()); 
         Attendant existing = attendantRepository.findByBadgeIgnoreCase(badge).orElse(null);
+
+        /* Se o badge já existe vai entrar no IF baixo. Se o status do badge for diferente de INACTIVE, 
+        ou seja, se já tiver um agente logado com esse badge, lança uma exceção. Caso contrário, 
+        atualiza o agente existente com os novos dados e o torna disponível.*/
         if (existing != null) {
             if (existing.getStatus() != AttendantStatus.INACTIVE) {
                 throw new IllegalStateException("O badge informado já está em uso por outro agente logado.");
@@ -59,6 +64,8 @@ public class AttendantService {
             redistributeWaitingRequestsFor(saved);
             dashboardSseService.notifyDashboardChanged();
             return toResponse(saved);
+            /* return toResponse(saved) - Converte os dados da entidade para um DTO limpo através de um 
+            método privado e encerra a execução retornando-o.*/
         }
 
         Attendant attendant = Attendant.builder()
@@ -76,6 +83,14 @@ public class AttendantService {
         return toResponse(saved);
     }
 
+    /* @Transactional(readOnly = true) – Otimização para operações puras de leitura. Desativa o mecanismo 
+    de monitoramento de alterações do Hibernate, liberando memória e acelerando a busca.
+
+    attendantRepository.findLogged() – Realiza a busca no banco por atendentes logados no sistema.
+
+    .stream().map(this::toResponse).toList() – Cria um fluxo (Stream API), mapeia cada entidade iterada 
+    enviando-a para o método privado de conversão desta própria classe (this::toResponse) e consolida 
+    tudo em uma nova estrutura de lista tipada.*/
     @Transactional(readOnly = true)
     public List<AttendantResponse> list() {
         return attendantRepository.findLogged()
@@ -87,7 +102,7 @@ public class AttendantService {
     @Transactional
     public AttendantResponse update(Long attendantId, UpdateAttendantRequest request) {
         Attendant attendant = attendantRepository.findById(attendantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Agente nao encontrado: " + attendantId));
+                .orElseThrow(() -> new ResourceNotFoundException("Agente não encontrado: " + attendantId));
 
         attendant.setName(request.name());
         attendant.setCategories(request.categories());
@@ -98,6 +113,7 @@ public class AttendantService {
         );
         refreshStatus(attendant, openRequestsCount);
         redistributeWaitingRequestsFor(attendant);
+
         dashboardSseService.notifyDashboardChanged();
         return toResponse(attendant);
     }
@@ -105,14 +121,14 @@ public class AttendantService {
     @Transactional
     public void delete(Long attendantId) {
         Attendant attendant = attendantRepository.findById(attendantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Agente nao encontrado: " + attendantId));
+                .orElseThrow(() -> new ResourceNotFoundException("Agente não encontrado: " + attendantId));
 
         long openRequestsCount = serviceRequestRepository.countByAttendantIdAndStatus(
                 attendant.getId(),
                 ServiceRequestStatus.IN_PROGRESS
         );
         if (openRequestsCount > 0) {
-            throw new IllegalStateException("Nao e possivel excluir agente com atendimentos em andamento.");
+            throw new IllegalStateException("Não é possivel excluir agentes com atendimentos em andamento.");
         }
 
         attendant.setStatus(AttendantStatus.INACTIVE);
@@ -125,14 +141,14 @@ public class AttendantService {
     @Transactional
     public AttendantResponse pause(Long attendantId) {
         Attendant attendant = attendantRepository.findById(attendantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Agente nao encontrado: " + attendantId));
+                .orElseThrow(() -> new ResourceNotFoundException("Agente não encontrado: " + attendantId));
 
         long openRequestsCount = serviceRequestRepository.countByAttendantIdAndStatus(
                 attendant.getId(),
                 ServiceRequestStatus.IN_PROGRESS
         );
         if (attendant.getStatus() != AttendantStatus.AVAILABLE || openRequestsCount > 0) {
-            throw new IllegalStateException("Pausa permitida apenas para agentes disponiveis.");
+            throw new IllegalStateException("Pausa permitida apenas para agentes disponíveis.");
         }
 
         Instant now = Instant.now();
@@ -153,13 +169,21 @@ public class AttendantService {
     @Transactional
     public AttendantResponse resume(Long attendantId) {
         Attendant attendant = attendantRepository.findById(attendantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Agente nao encontrado: " + attendantId));
+                .orElseThrow(() -> new ResourceNotFoundException("Agente não encontrado: " + attendantId));
 
         if (attendant.getStatus() != AttendantStatus.PAUSED) {
             throw new IllegalStateException("Somente agentes em pausa podem voltar.");
         }
 
         Instant now = Instant.now();
+
+
+        /*findFirstBy...AndFinishedAtIsNull... – Faz uma busca refinada para localizar a linha de histórico 
+        de pausa que abrimos no método anterior (que possui a coluna de término finishedAt como nula).
+
+        .ifPresent(...) – Programação funcional que diz: "Se você encontrar esse registro de pausa em 
+        aberto, execute essa Arrow Function (->): defina a data de encerramento dela como now e salve o 
+        fechamento no banco".*/
         attendantPauseRepository.findFirstByAttendantIdAndFinishedAtIsNullOrderByStartedAtDesc(attendant.getId())
                 .ifPresent(pause -> {
                     pause.setFinishedAt(now);
